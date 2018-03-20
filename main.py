@@ -9,6 +9,7 @@ from data_models import Recipe, Item
 from graphviz import Digraph
 
 import pdb
+import os
 
 from pprint import pprint
 from functools import lru_cache
@@ -40,10 +41,19 @@ def get_item_recipe(item_id):
     else:
         return Recipe(i.recipe_id)
 
+def account_has_item(item_id):
+    character_items = get_all_items()
+    for char_name, item in character_items:
+        if item == item_id:
+            return True
+    return False
+
 def get_item_make_price(item_id, recipe_listing, dot):
     recipe = get_item_recipe(item_id)
     #todo: check inventory for mats and reduce price etc
-    if recipe is None:
+    if account_has_item(item_id):
+        return 0
+    elif recipe is None:
         return get_item_min_sell_price(item_id)
     else:
         return calculate_cost_profit(recipe.recipe_id, recipe_listing, dot)
@@ -78,15 +88,14 @@ def calculate_cost_profit(recipe_id, recipe_listing, dot):
     return cost
 
 def main():
-    count = 0
+
+    if not os.path.isdir('graphs'):
+        os.makedirs('graphs')
 
     for character_name, item_id in get_all_items():
         graph_details = []
         recipe_listing = []
         #print("Checking item num {} {}".format(character_name, item_id))
-        #count += 1
-        #if count > 10:
-        #    break
         buy_price = get_item_max_buy_price(item_id)
         cost_price = 0
         fees = int(buy_price * .15)
@@ -132,7 +141,7 @@ def main():
                             label += " : {}".format(edge['cost'])
                         dot.node(i, color = edge['color'], label=label)
 
-            dot.render(view=True)
+            dot.render(os.path.join('graphs', item.name), view=True)
 
 
 if __name__ == "__main__":
