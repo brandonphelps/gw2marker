@@ -5,3 +5,7 @@ secrets.py
 
 .idea/
 
+
+items/
+recipes/
+requests_cache/
