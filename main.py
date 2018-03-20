@@ -3,7 +3,7 @@
 from data_gathering import GW2Request, Uri, get_recipe_ids
 from data_gathering import get_item_min_sell_price, get_recipe_max_buy_price
 from data_gathering import get_characters, get_character_crafting, get_character_recipes
-from data_gathering import get_known_recipes
+from data_gathering import get_known_recipes, get_all_items, get_item_max_buy_price
 from data_models import Recipe, Item
 
 from graphviz import Digraph
@@ -80,26 +80,45 @@ def calculate_cost_profit(recipe_id, recipe_listing, dot):
 def main():
     count = 0
 
+    for character_name, item_id in get_all_items():
+        graph_details = []
+        recipe_listing = []
+        #print("Checking item num {} {}".format(character_name, item_id))
+        #count += 1
+        #if count > 10:
+        #    break
+        buy_price = get_item_max_buy_price(item_id)
+        cost_price = 0
+        fees = int(buy_price * .15)
+        item = Item(item_id)
+        if item:
+            print("{} Sell Value {} Cost {}".format(item.name, buy_price, cost_price + fees))
+        else:
+            print("Failed to get item info for: {}".format(rep.output_id))
+
+        if buy_price > (cost_price + fees):
+            print("Sell that {}".format(item.name))
+        
+
     for character_name, recipe_num in get_known_recipes():
         graph_details = []
         recipe_listing = []
-        print("Checking recipe num: {}".format(recipe_num))
+        #print("Checking recipe num: {}".format(recipe_num))
         #count += 1
         #if count > 10:
         #    break
 
         buy_price = get_recipe_max_buy_price(recipe_num)
         cost_price = calculate_cost_profit(recipe_num, recipe_listing, graph_details)
-        fees = int(cost_price * .15)
+        fees = int(buy_price * .15)
         rep = Recipe(recipe_num)
         item = Item(rep.output_id)
         if item:
             print("{} Sell Value {} Cost {}".format(item.name, buy_price, cost_price + fees))
         else:
             print("Failed to get item info for: {}".format(rep.output_id))
+
         if buy_price > (cost_price + fees):
-
-
             if item:
                 print(item.name)
             print("{} can make {}".format(character_name, recipe_num))

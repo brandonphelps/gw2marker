@@ -1,4 +1,5 @@
 
+from pprint import pprint
 from secrets import key
 
 from enum import Enum
@@ -37,13 +38,12 @@ class Uri(Enum):
     characters = ('characters/{}', True, 1)
     character_crafting = ('characters/{}/crafting', True, 1)
     character_recipes = ('characters/{}/recipes', True, 1)
-
+    character_items = ('characters/{}/inventory', True, 1)
 
     def __init__(self, path, requires_auth, optional_param_count=0):
         self.path = path
         self.requires_auth = requires_auth
         self.optional_param_count = optional_param_count
-
 
 class GW2Request:
 
@@ -170,6 +170,7 @@ def get_recipe_info(recipe_id):
 @cache_data
 def get_recipe_max_buy_price(recipe_id):
     recipe_info = get_recipe_info(recipe_id)
+    # print("{}: {}".format(recipe_id, recipe_info))
     return get_item_max_buy_price(recipe_info['output_item_id'])
 
 
@@ -213,10 +214,25 @@ def get_character_recipes(char_name):
 def get_known_recipes():
     return [(j, i) for j in get_characters() for i in get_character_recipes(j)['recipes']]
 
+def get_all_items():
+    return [(j, i) for j in get_characters() for i in get_character_items(j)]
+
+@timed_cache_data(10 * 60)
+def get_character_items(char_name, collasped=True):
+    result = requester.perform_request(Uri.character_items, char_name)
+    results = []
+    if result:
+        for bag in result['bags']:
+            if bag:
+                for item in bag['inventory']:
+                    if item and 'binding' in item.keys() and item['binding'] not in ['Account', 'AcountBound', 'NoSalvage', 'NoSell', 'AccountBindOnUse']:
+                        results.append(item['id'])
+    return results
+
 @timed_cache_data(10)
 def tester(x):
     time.sleep(2)
     return x*10*10*10*(10**10)*(10**10)
 
 if __name__ == '__main__':
-    print(tester(12))
+    pprint(get_character_items('Hydra Of Stone'))
