@@ -91,14 +91,12 @@ def main():
         cost_price = 0
         fees = int(buy_price * .15)
         item = Item(item_id)
-        if item:
-            print("{} Sell Value {} Cost {}".format(item.name, buy_price, cost_price + fees))
-        else:
-            print("Failed to get item info for: {}".format(rep.output_id))
-
+        #if item:
+        #    print("{} Sell Value {} Cost {}".format(item.name, buy_price, cost_price + fees))
+        #else:
+        #    print("Failed to get item info for: {}".format(rep.output_id))
         if buy_price > (cost_price + fees):
-            print("Sell that {}".format(item.name))
-        
+            print("Sell that {} {} for {}".format(character_name, item.name, buy_price - fees))
 
     for character_name, recipe_num in get_known_recipes():
         graph_details = []
@@ -113,10 +111,10 @@ def main():
         fees = int(buy_price * .15)
         rep = Recipe(recipe_num)
         item = Item(rep.output_id)
-        if item:
-            print("{} Sell Value {} Cost {}".format(item.name, buy_price, cost_price + fees))
-        else:
-            print("Failed to get item info for: {}".format(rep.output_id))
+        #if item:
+        #    print("{} Sell Value {} Cost {}".format(item.name, buy_price, cost_price + fees))
+        #else:
+        #    print("Failed to get item info for: {}".format(rep.output_id))
 
         if buy_price > (cost_price + fees):
             if item:

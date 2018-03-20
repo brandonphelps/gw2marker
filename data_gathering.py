@@ -13,6 +13,8 @@ from functools import lru_cache
 
 import hashlib
 
+
+
 def RateLimited(maxPerSecond):
     minInterval = 1.0 / float(maxPerSecond)
     def decorate(func):
@@ -51,6 +53,7 @@ class GW2Request:
 
     def __init__(self, version):
         self.version = version
+        self.uri = None
 
     def perform_request(self, option, *args):
         uri = "{}/{}/{}".format(self.base_url, self.version, option.path)
@@ -65,8 +68,9 @@ class GW2Request:
         return self._perform_request(uri)
 
     def _perform_request(self, uri):
-        #print(uri)
-        r = requests.get(uri)
+        # print(self.uri)
+        self.uri = uri
+        r = requests.get(self.uri)
         if r:
             return r.json()
         return None
@@ -121,7 +125,7 @@ def timed_cache_data(timeout):
                 # check if we need to write resultant back in since we passed timeout
                 #print(timed_result)
                 if timed_result['rewrite_time'] <= time.time():
-                    print("Recomputing: {}({})".format(func.__name__, args))
+                    #print("Recomputing: {}({})".format(func.__name__, args))
                     val = func(*args, **kwargs)
                     timed_result = {'rewrite_time': time.time() + timeout,
                                     'value' : val}
@@ -178,7 +182,8 @@ def get_recipe_max_buy_price(recipe_id):
 def get_item_max_buy_price(item_id):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
     if item_info is None:
-        print("Failed to get item info for id: {}".format(item_id))
+        # print("Failed to get item info for id: {}".format(item_id))
+        pass
 
     if item_info and item_info['buys']:
         return max(item_info['buys'], key=lambda x: int(x['unit_price']))['unit_price']
@@ -220,13 +225,17 @@ def get_all_items():
 @timed_cache_data(10 * 60)
 def get_character_items(char_name, collasped=True):
     result = requester.perform_request(Uri.character_items, char_name)
+    #pprint(result)
     results = []
     if result:
         for bag in result['bags']:
             if bag:
                 for item in bag['inventory']:
-                    if item and 'binding' in item.keys() and item['binding'] not in ['Account', 'AcountBound', 'NoSalvage', 'NoSell', 'AccountBindOnUse']:
-                        results.append(item['id'])
+                    if item:
+                        if ('binding' in item.keys() and item['binding'] not in ['Account', 'AcountBound', 'NoSalvage', 'NoSell', 'AccountBindOnUse']):
+                            results.append(item['id'])
+                        else:
+                            results.append(item['id'])
     return results
 
 @timed_cache_data(10)
@@ -235,4 +244,4 @@ def tester(x):
     return x*10*10*10*(10**10)*(10**10)
 
 if __name__ == '__main__':
-    pprint(get_character_items('Hydra Of Stone'))
+    pprint(get_all_items())
