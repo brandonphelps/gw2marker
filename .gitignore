@@ -1,0 +1,7 @@
+secrets.py
+*.pyc
+
+*~
+
+.idea/
+

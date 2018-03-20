@@ -84,18 +84,22 @@ def main():
         graph_details = []
         recipe_listing = []
         print("Checking recipe num: {}".format(recipe_num))
-        count += 1
-        if count > 1:
-            break
-
-
+        #count += 1
+        #if count > 10:
+        #    break
 
         buy_price = get_recipe_max_buy_price(recipe_num)
         cost_price = calculate_cost_profit(recipe_num, recipe_listing, graph_details)
         fees = int(cost_price * .15)
+        rep = Recipe(recipe_num)
+        item = Item(rep.output_id)
+        if item:
+            print("{} Sell Value {} Cost {}".format(item.name, buy_price, cost_price + fees))
+        else:
+            print("Failed to get item info for: {}".format(rep.output_id))
         if buy_price > (cost_price + fees):
-            rep = Recipe(recipe_num)
-            item = Item(rep.output_id)
+
+
             if item:
                 print(item.name)
             print("{} can make {}".format(character_name, recipe_num))

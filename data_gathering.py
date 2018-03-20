@@ -87,7 +87,7 @@ def cache_data(func):
         if not os.path.isdir(os.path.dirname(full_path)):
             os.makedirs(os.path.dirname(full_path))
 
-        print("filename: {}".format(full_path))
+        #print("filename: {}".format(full_path))
         if os.path.isfile(full_path):
             with open(full_path, 'r') as reader:
                 val = json.loads(reader.read())
@@ -112,14 +112,14 @@ def timed_cache_data(timeout):
             if not os.path.isdir(os.path.dirname(full_path)):
                 os.makedirs(os.path.dirname(full_path))
 
-            print("filename: {}".format(full_path))
-            print("Current time: {}".format(time.time()))
+            #print("filename: {}".format(full_path))
+            #print("Current time: {}".format(time.time()))
             # TODO: just lazy, but do a function for writing so it shared, 
             if os.path.isfile(full_path):
                 with open(full_path, 'r') as reader:
                     timed_result = json.loads(reader.read())
                 # check if we need to write resultant back in since we passed timeout
-                print(timed_result)
+                #print(timed_result)
                 if timed_result['rewrite_time'] <= time.time():
                     print("Recomputing: {}({})".format(func.__name__, args))
                     val = func(*args, **kwargs)
@@ -136,7 +136,6 @@ def timed_cache_data(timeout):
                 
                 with open(full_path, 'w') as writer:
                     writer.write(json.dumps(timed_result))
-
             return val
         return inner
     return wrapper
@@ -174,6 +173,7 @@ def get_recipe_max_buy_price(recipe_id):
     return get_item_max_buy_price(recipe_info['output_item_id'])
 
 
+@timed_cache_data(3 * 60) # 3 minutes
 def get_item_max_buy_price(item_id):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
     if item_info is None:
@@ -184,6 +184,7 @@ def get_item_max_buy_price(item_id):
     else:
         return 0
 
+@timed_cache_data(3 * 60) # 3 minutes
 def get_item_min_sell_price(item_id):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
     if item_info is None:
