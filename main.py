@@ -4,14 +4,23 @@ from data_gathering import GW2Request, Uri, get_recipe_ids
 from data_gathering import get_item_min_sell_price, get_recipe_max_buy_price
 from data_gathering import get_characters, get_character_crafting, get_character_recipes
 from data_gathering import get_known_recipes
-from d_models import Recipe, Item
+from data_models import Recipe, Item
 
 from graphviz import Digraph
 
 import pdb
 
 from pprint import pprint
+from functools import lru_cache
 
+all_items_by_id = {}
+
+def load_all_items():
+    print("Loading Items")
+    for i in range(1000):
+        all_items_by_id[str(i)] = Item(i)
+
+@lru_cache(maxsize=40000)
 def get_item_recipe(item_id):
     i = Item(item_id)
     #print("Get item {} recipe: {}".format(i.name, i.recipe_id))
@@ -41,8 +50,6 @@ def get_item_make_price(item_id, recipe_listing, dot):
 
 def calculate_cost_profit(recipe_id, recipe_listing, dot):
     recipe = Recipe(recipe_id)
-
-
     cost = 0
     item_t = Item(recipe.output_id)
     for j in recipe.input_info:
@@ -71,14 +78,18 @@ def calculate_cost_profit(recipe_id, recipe_listing, dot):
     return cost
 
 def main():
-
+    count = 0
 
     for character_name, recipe_num in get_known_recipes():
         graph_details = []
         recipe_listing = []
         print("Checking recipe num: {}".format(recipe_num))
+        count += 1
+        if count > 1:
+            break
 
-        dot = Digraph(comment=recipe_num)
+
+
         buy_price = get_recipe_max_buy_price(recipe_num)
         cost_price = calculate_cost_profit(recipe_num, recipe_listing, graph_details)
         fees = int(cost_price * .15)
@@ -90,6 +101,7 @@ def main():
             print("{} can make {}".format(character_name, recipe_num))
             print("Buy Price {} Total cost {} fee {}".format(buy_price, cost_price, fees))
             pprint(recipe_listing)
+            dot = Digraph(comment=recipe_num)
             for edge in graph_details:
                 dot.edge(*edge['edge'])
                 for i in edge['edge']:

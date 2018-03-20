@@ -5,8 +5,12 @@ from enum import Enum
 import time
 import requests
 import re
+import os
+import json
 
 from functools import lru_cache
+
+import hashlib
 
 def RateLimited(maxPerSecond):
     minInterval = 1.0 / float(maxPerSecond)
@@ -40,12 +44,14 @@ class Uri(Enum):
         self.requires_auth = requires_auth
         self.optional_param_count = optional_param_count
 
+
 class GW2Request:
+
     base_url = 'https://api.guildwars2.com'
+
     def __init__(self, version):
         self.version = version
-        
-    @RateLimited(10)
+
     def perform_request(self, option, *args):
         uri = "{}/{}/{}".format(self.base_url, self.version, option.path)
         if option.optional_param_count != 0:
@@ -65,41 +71,75 @@ class GW2Request:
             return r.json()
         return None
 
-    def get_account(self):
-        uri = "{}/{}/{}?access_token={}".format(self.base_url, self.version, 'account', key)
-        return self._perform_request(uri)
-
-    def _append_key(self, uri):
-        return "{}?access_token={}".format(uri, key)
-
-    def commerce(self, item_id=None):
-        uri = "{}/{}/{}".format(self.base_url, self.version, 'commerce/listings')
-        if item_id:
-            uri = "{}/{}".format(uri, item_id)
-
-        return self._perform_request(uri)
-
-    def get_item_info(self, item_id):
-        if type(item_id) == int:
-            uri = "{}/{}/{}/{}".format(self.base_url, self.version, "items", item_id)
-        else:
-            return None
-        return self._perform_request(uri)
-
-    def get_recipe_info(self, item_id):
-        uri = "{}/{}/{}/{}".format(self.base_url, self.version, "recipes", item_id)
-        return self._perform_request(uri)
-
-    def get_character_craftables(self):
-        uri = "{}/{}/{}?access_token={}".format(self.base_url, self.version, 'account/recipes', key)
-        return self._perform_request(uri)
-
-    def get_character_craftable_info(self):
-        craf_reipces = self.get_character_craftables()
-        for i in craf_reipces:
-            pprint(self.get_recipe_info(i))
 
 requester = GW2Request('v2')
+
+cached_folder = 'requests_cache'
+
+def cache_data(func):
+    def inner(*args, **kwargs):
+        inter_folder = func.__name__
+        m = hashlib.sha256()
+        for i in args:
+            m.update(str(i).encode('utf-8'))
+        full_path = os.path.join(cached_folder, inter_folder, m.hexdigest())
+
+        if not os.path.isdir(os.path.dirname(full_path)):
+            os.makedirs(os.path.dirname(full_path))
+
+        print("filename: {}".format(full_path))
+        if os.path.isfile(full_path):
+            with open(full_path, 'r') as reader:
+                val = json.loads(reader.read())
+        else:
+            val = func(*args, **kwargs)
+            with open(full_path, 'w') as writer:
+                writer.write(json.dumps(val))
+        return val
+    return inner
+
+#todo: figure out if the cache_data function can be used in this function
+#        or see if there is some common code that could be grouped 
+def timed_cache_data(timeout):
+    def wrapper(func):
+        def inner(*args, **kwargs):
+            inter_folder = func.__name__
+            m = hashlib.sha256()
+            for i in args:
+                m.update(str(i).encode('utf-8'))
+            full_path = os.path.join(cached_folder, inter_folder, m.hexdigest())
+
+            if not os.path.isdir(os.path.dirname(full_path)):
+                os.makedirs(os.path.dirname(full_path))
+
+            print("filename: {}".format(full_path))
+            print("Current time: {}".format(time.time()))
+            # TODO: just lazy, but do a function for writing so it shared, 
+            if os.path.isfile(full_path):
+                with open(full_path, 'r') as reader:
+                    timed_result = json.loads(reader.read())
+                # check if we need to write resultant back in since we passed timeout
+                print(timed_result)
+                if timed_result['rewrite_time'] <= time.time():
+                    print("Recomputing: {}({})".format(func.__name__, args))
+                    val = func(*args, **kwargs)
+                    timed_result = {'rewrite_time': time.time() + timeout,
+                                    'value' : val}
+                    with open(full_path, 'w') as writer:
+                        writer.write(json.dumps(timed_result))
+                else:
+                    val = timed_result['value']
+            else:
+                val = func(*args, **kwargs)
+                timed_result = {'rewrite_time' : time.time() + timeout,
+                                'value' : val}
+                
+                with open(full_path, 'w') as writer:
+                    writer.write(json.dumps(timed_result))
+
+            return val
+        return inner
+    return wrapper
 
 
 ####### data caching
@@ -113,22 +153,26 @@ class NoBuyException(Exception):
     pass
 
 
+@cache_data
 def get_item_info(item_id):
     item_info = requester.perform_request(Uri.items, item_id)
     return item_info
 
-@lru_cache(maxsize=10)
+@cache_data
 def get_recipe_ids():
     recipe_ids = requester.perform_request(Uri.recipes)
     return recipe_ids
 
+@cache_data
 def get_recipe_info(recipe_id):
     recipe_info = requester.perform_request(Uri.recipes, recipe_id)
     return recipe_info
 
+@cache_data
 def get_recipe_max_buy_price(recipe_id):
     recipe_info = get_recipe_info(recipe_id)
     return get_item_max_buy_price(recipe_info['output_item_id'])
+
 
 def get_item_max_buy_price(item_id):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
@@ -150,17 +194,28 @@ def get_item_min_sell_price(item_id):
         # todo add exception handling
         return 100000000
 
+@cache_data
 def get_characters(char=None):
     if char:
         return requester.perform_request(Uri.characters, char)
     else:
         return requester.perform_request(Uri.characters)
 
+@cache_data
 def get_character_crafting(char_name):
     return requester.perform_request(Uri.character_crafting, char_name)
 
+@cache_data
 def get_character_recipes(char_name):
     return requester.perform_request(Uri.character_recipes, char_name)
 
 def get_known_recipes():
     return [(j, i) for j in get_characters() for i in get_character_recipes(j)['recipes']]
+
+@timed_cache_data(10)
+def tester(x):
+    time.sleep(2)
+    return x*10*10*10*(10**10)*(10**10)
+
+if __name__ == '__main__':
+    print(tester(12))
