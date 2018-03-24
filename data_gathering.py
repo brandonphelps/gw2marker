@@ -125,7 +125,7 @@ def timed_cache_data(timeout):
                 # check if we need to write resultant back in since we passed timeout
                 #print(timed_result)
                 if timed_result['rewrite_time'] <= time.time():
-                    #print("Recomputing: {}({})".format(func.__name__, args))
+                    print("Recomputing: {}({})".format(func.__name__, args))
                     val = func(*args, **kwargs)
                     timed_result = {'rewrite_time': time.time() + timeout,
                                     'value' : val}
@@ -155,7 +155,6 @@ class NoBuyException(Exception):
     # No available buyers
     pass
 
-
 @cache_data
 def get_item_info(item_id):
     item_info = requester.perform_request(Uri.items, item_id)
@@ -176,7 +175,6 @@ def get_recipe_max_buy_price(recipe_id):
     recipe_info = get_recipe_info(recipe_id)
     # print("{}: {}".format(recipe_id, recipe_info))
     return get_item_max_buy_price(recipe_info['output_item_id'])
-
 
 @timed_cache_data(3 * 60) # 3 minutes
 def get_item_max_buy_price(item_id):
