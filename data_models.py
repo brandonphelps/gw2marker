@@ -1,10 +1,14 @@
-from data_gathering import get_recipe_info, get_item_max_buy_price, get_item_min_sell_price, get_item_info, get_recipe_ids, timed_cache_data, get_recipe_max_buy_price
+from data_gathering import get_recipe_info, get_item_max_buy_price, get_item_min_sell_price, get_item_info, get_recipe_ids, timed_cache_data, get_recipe_max_buy_price, get_known_recipes
+
+from graphviz import Digraph
 
 from pprint import pprint
 import os
 import json
 from collections import defaultdict
 from itertools import permutations
+from enum import Enum
+
 
 class Item():
     def __init__(self, id):
@@ -110,7 +114,7 @@ class LoadedRecipe():
                 print("What did you give me?")
 
     def __str__(self):
-        return "LoadedRecipe: {}".format(str(self.my_id))
+        return "LoadedRecipe: {}".format(str(self.recipe_id))
 
     def __repr__(self):
         return str(self)
@@ -124,7 +128,12 @@ class LoadedRecipe():
             else:
                 yield i['value']
 
-    
+class LoadedButFullRecipe(LoadedRecipe):
+    def __init__(self, id):
+        super().__init__(id)
+        self.min_sell_price = 0
+        self.max_buy_price = 0
+        
 
 def build_dep_graph(parent, dep_id_graph, parent_ids, recipe_id_map):
     children = parent.input_info
@@ -145,8 +154,6 @@ def children_buy_price(parent):
         else:
             t += i['count'] * get_item_max_buy_price(i['value'])
     return t
-
-
 
 def children_frontier_price(frontier):
     t = 0
@@ -169,7 +176,6 @@ def already_have_frontier(values, frontier):
             break
     return False
                 
-
 def get_frontiers(current_frontier, values):
     #if not already_have_frontier(values, current_frontier):
     values.append(current_frontier)
@@ -210,10 +216,79 @@ def find_max(recipe):
     else:
         return parent_buy_price, [recipe]
 
-if __name__ == "__main__":
-    k = LoadedRecipe(463)
+def find_min(recipe):
+    parent_sell_price = get_item_min_sell_price(recipe.output_id)
+    tmp = 0
+    ing = []
+    for j in recipe.input_info:
+        if type(j['value']) == LoadedRecipe:
+            ing_price, tmp_ing = find_min(j['value'])
+            ing.extend(tmp_ing)
+            tmp += j['count'] * ing_price
+        else:
+            ing.append(j)
+            tmp += j['count'] * get_item_min_sell_price(j['value'])
 
-    max_buy_price = find_max(k)
+    if tmp < parent_sell_price:
+        return tmp, ing
+    else:
+        return parent_sell_price, [recipe]
+
+def graph_recipe(recipe, dot, values=None):
+    item_info = get_item_info(recipe.output_id)
+    pprint(item_info)
+    for j in recipe.input_info:
+        if type(j['value']) == LoadedRecipe:
+            j_i_info = get_item_info(j['value'].output_id)
+            dot.edge(item_info['name'], j_i_info['name'], label=str(j['count']))
+            if values:
+                if values == Dir.Buy:
+                    buy_price = get_item_max_buy_price(j['value'].output_id)
+                elif values == Dir.Sell:
+                    buy_price = get_item_min_sell_price(j['value'].output_id)
+                dot.node(item_info['name'], label="{}: {}".format(item_info['name'], buy_price))
+            graph_recipe(j['value'], dot)
+        else:
+            j_i_info = get_item_info(j['value'])
+            dot.edge(item_info['name'], j_i_info['name'], label=str(j['count']))
+            if values:
+                if values == Dir.Buy:
+                    buy_price = get_item_max_buy_price(item_info['id'])
+                    j_i_buy_price = get_item_max_buy_price(j_i_info['id'])
+                elif values == Dir.Sell:
+                    buy_price = get_item_min_sell_price(item_info['id'])
+                    j_i_buy_price = get_item_min_sell_price(j_i_info['id'])
+
+                dot.node(item_info['name'], label="{}: {}".format(item_info['name'], buy_price))
+                dot.node(j_i_info['name'], label="{}: ({}x) {}".format(j_i_info['name'], j['count'], j['count'] * j_i_buy_price))
+                    
+
+class Dir(Enum):
+    Buy = 1
+    Sell = 2
+    
+if __name__ == "__main__":
+    for charac, recipe_num in get_known_recipes():
+        k = LoadedRecipe(recipe_num)
+        
+        dot = Digraph(comment="Buy")
+        graph_recipe(k, dot, Dir.Buy)
+        dot.render('buy', view=True)
+
+        dot_sell = Digraph(comment="Sell")
+        graph_recipe(k, dot_sell, Dir.Sell)
+        dot_sell.render('sell', view=True)
+
+        min_sell_price = find_min(k)
+        max_buy_price = find_max(k)
+
+        print(charac)
+        print("Max buy price")
+        pprint(max_buy_price)
+        
+        print("Min Sell price")
+        pprint(min_sell_price)
+        break
 
     #parent_buy_price = get_item_max_buy_price(k.output_id)
     #left_child_buy_price_t = k.input_info[0]['count'] * get_item_max_buy_price(k.input_info[0]['value'])
