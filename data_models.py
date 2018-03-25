@@ -99,7 +99,6 @@ class LoadedRecipe():
         LoadedRecipeId += 1
         self.recipe_id = id
         recipe_info = get_recipe_info(self.recipe_id)
-        pprint(recipe_info)
         self.output_id = recipe_info['output_item_id']
         self.input_info = []
         for ing in recipe_info['ingredients']:
@@ -236,7 +235,6 @@ def find_min(recipe):
 
 def graph_recipe(recipe, dot, values=None):
     item_info = get_item_info(recipe.output_id)
-    pprint(item_info)
     for j in recipe.input_info:
         if type(j['value']) == LoadedRecipe:
             j_i_info = get_item_info(j['value'].output_id)
@@ -266,29 +264,64 @@ def graph_recipe(recipe, dot, values=None):
 class Dir(Enum):
     Buy = 1
     Sell = 2
-    
+
+def create_table(recipe_id, table):
+    recipe_info = get_recipe_info(recipe_id)
+    recipe_item_info = get_item_info(recipe_info['output_item_id'])
+    print('\nRecipe output: {}'.format(recipe_item_info['name']))
+    k = find_max(LoadedRecipe(recipe_id))
+    print(k)
+    for i in k[1]:
+        print(i)
+        if type(i) == LoadedRecipe:
+            item_info = get_item_info(i.output_id)
+            print("{}: {}".format(item_info['name'], i))
+            #for j in i.input_info:
+            #    print(j)
+        else:
+            item_info = get_item_info(i['value'])
+            print("{}: {}".format(item_info['name'], i))
+            if item_info['name'] in table.keys():
+                print("Already selling: {}".format(item_info['name']))
+                print(k[0])
+            else:
+                table[item_info['name']] = {'action': 'Sell',
+                                            'parent' : recipe_id,
+                                            'value' : k[0]}
+
 if __name__ == "__main__":
+    table = {}
+    count = 0
+    max_count = 40
+    #for i in range(2, 700):
+    #    k = LoadedRecipe(i)
+    #    dot = Digraph(comment="Buy")
+    #    graph_recipe(k, dot, Dir.Buy)
+    #    dot.render('buy_{}'.format(k.output_id), view=True)
+    #    create_table(i, table)
+
     for charac, recipe_num in get_known_recipes():
-        k = LoadedRecipe(recipe_num)
-        
-        dot = Digraph(comment="Buy")
-        graph_recipe(k, dot, Dir.Buy)
-        dot.render('buy', view=True)
+        create_table(recipe_num, table)
+    pprint(table)
 
-        dot_sell = Digraph(comment="Sell")
-        graph_recipe(k, dot_sell, Dir.Sell)
-        dot_sell.render('sell', view=True)
-
-        min_sell_price = find_min(k)
-        max_buy_price = find_max(k)
-
-        print(charac)
-        print("Max buy price")
-        pprint(max_buy_price)
-        
-        print("Min Sell price")
-        pprint(min_sell_price)
-        break
+    #    
+    #
+    #    dot_sell = Digraph(comment="Sell")
+    #    graph_recipe(k, dot_sell, Dir.Sell)
+    #    dot_sell.render('sell', view=True)
+    #
+    #
+    #    min_sell_price = find_min(k)
+    #    max_buy_price = find_max(k)
+    #
+    #
+    #    print(charac)
+    #    print("Max buy price")
+    #    pprint(max_buy_price)
+    #
+    #    print("Min Sell price")
+    #    pprint(min_sell_price)
+    #    break
 
     #parent_buy_price = get_item_max_buy_price(k.output_id)
     #left_child_buy_price_t = k.input_info[0]['count'] * get_item_max_buy_price(k.input_info[0]['value'])

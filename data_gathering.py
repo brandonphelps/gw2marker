@@ -176,7 +176,7 @@ def get_recipe_max_buy_price(recipe_id):
     # print("{}: {}".format(recipe_id, recipe_info))
     return get_item_max_buy_price(recipe_info['output_item_id'])
 
-@timed_cache_data(3 * 60) # 3 minutes
+@timed_cache_data(20 * 60) # 3 minutes
 def get_item_max_buy_price(item_id):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
     if item_info is None:
