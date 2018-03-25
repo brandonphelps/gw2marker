@@ -206,9 +206,29 @@ def find_max(recipe):
         if type(j['value']) == LoadedRecipe:
             ing_price, tmp_ing = find_max(j['value'])
             ing.extend(tmp_ing)
+            j['coinage'] = j['count'] * ing_price
             tmp += j['count'] * ing_price
         else:
             ing.append(j)
+            j['coinage'] = j['count'] * get_item_max_buy_price(j['value'])
+            tmp += j['count'] * get_item_max_buy_price(j['value'])
+    if tmp > parent_buy_price:
+        return tmp, ing
+    else:
+        return parent_buy_price, [{'value' : recipe, 'count' : 1, 'coinage' : parent_buy_price}]
+
+def find_sub_max(recipe):
+    parent_buy_price = get_item_max_buy_price(recipe.output_id)
+    tmp = 0
+    ing = []
+    for j in recipe.input_info:
+        if type(j['value']) == LoadedRecipe:
+            ing_price, tmp_ing = find_sub_max(j['value'])
+            ing.extend(tmp_ing)
+            tmp += j['count'] * ing_price
+        else:
+            ing.append(j)
+            j['value'] = j['count'] * get_item_max_buy_price(j['value'])
             tmp += j['count'] * get_item_max_buy_price(j['value'])
     if tmp > parent_buy_price:
         return tmp, ing
@@ -269,15 +289,30 @@ def create_table(recipe_id, table):
     recipe_info = get_recipe_info(recipe_id)
     recipe_item_info = get_item_info(recipe_info['output_item_id'])
     print('\nRecipe output: {}'.format(recipe_item_info['name']))
-    k = find_max(LoadedRecipe(recipe_id))
+    l = LoadedRecipe(recipe_id)
+    k = find_max(l)
     print(k)
     for i in k[1]:
         print(i)
-        if type(i) == LoadedRecipe:
+        if type(i['value']) == LoadedRecipe:
+            i = i['value']
             item_info = get_item_info(i.output_id)
             print("{}: {}".format(item_info['name'], i))
-            #for j in i.input_info:
-            #    print(j)
+            if item_info['name'] in table.keys():
+                print("Already have {}".format(item_info['name']))
+            else:
+                for j in i.input_info:
+                    if type(j['value']) == LoadedRecipe:
+                        item_info_id = j['value'].output_id
+                    else:
+                        item_info_id = j['value']
+                    ing_item_info = get_item_info(item_info_id)
+                    table[ing_item_info['name']] = {'action' : 'Material/Buy',
+                                                    'parent' : recipe_item_info['name'],
+                                                    'value' : j['coinage'],
+                                                    'count' : j['count']}
+                    print(j)
+                    print(ing_item_info)
         else:
             item_info = get_item_info(i['value'])
             print("{}: {}".format(item_info['name'], i))
@@ -286,8 +321,9 @@ def create_table(recipe_id, table):
                 print(k[0])
             else:
                 table[item_info['name']] = {'action': 'Sell',
-                                            'parent' : recipe_id,
-                                            'value' : k[0]}
+                                            'parent' : recipe_item_info['name'],
+                                            'value' : i['coinage'],
+                                            'count' : i['count']}
 
 if __name__ == "__main__":
     table = {}
@@ -304,55 +340,3 @@ if __name__ == "__main__":
         create_table(recipe_num, table)
     pprint(table)
 
-    #    
-    #
-    #    dot_sell = Digraph(comment="Sell")
-    #    graph_recipe(k, dot_sell, Dir.Sell)
-    #    dot_sell.render('sell', view=True)
-    #
-    #
-    #    min_sell_price = find_min(k)
-    #    max_buy_price = find_max(k)
-    #
-    #
-    #    print(charac)
-    #    print("Max buy price")
-    #    pprint(max_buy_price)
-    #
-    #    print("Min Sell price")
-    #    pprint(min_sell_price)
-    #    break
-
-    #parent_buy_price = get_item_max_buy_price(k.output_id)
-    #left_child_buy_price_t = k.input_info[0]['count'] * get_item_max_buy_price(k.input_info[0]['value'])
-    #right_child_buy_price_t = k.input_info[1]['count'] * get_item_max_buy_price(k.input_info[1]['value'])
-
-    #parent_cost = get_recipe_min_make_price(k)
-
-    #if left_child_buy_price_t + right_child_buy_price_t > parent_buy_price:
-    #    print("Sell ing")
-    
-    #dep_id_graph = defaultdict(lambda : defaultdict(lambda : False))
-    #parent_ids = []
-    #recipe_id_map = {}
-    #build_dep_graph(k, dep_id_graph, parent_ids, recipe_id_map)
-
-    #parent = k
-    #frontiers = [[k]]
-    #get_frontiers(parent.input_info, frontiers)
-
-    """
-    t = 0
-    for i in k.input_info:
-        print(i)
-        if type(i['value']) == LoadedRecipe:
-            print('hello')
-            t += i['count'] * get_recipe_max_buy_price(i['value'].recipe_id)
-        else:
-            print("world")
-            t += i['count'] * get_item_max_buy_price(i['value'])
-
-    if t > b:
-        print('Sell ingredents')
-    print(t)
-    """
