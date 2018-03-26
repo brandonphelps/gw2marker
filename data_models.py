@@ -81,7 +81,6 @@ def get_item_recipe(item_id):
     item_info = get_item_info(item_id)
     pprint(item_info)
     for i in get_recipe_ids():
-        print("Checking id: {}".format(i))
         recipe_info = get_recipe_info(i)
         if recipe_info['output_item_id'] == item_id:
             # found recipe thus return it
@@ -127,12 +126,6 @@ class LoadedRecipe():
             else:
                 yield i['value']
 
-class LoadedButFullRecipe(LoadedRecipe):
-    def __init__(self, id):
-        super().__init__(id)
-        self.min_sell_price = 0
-        self.max_buy_price = 0
-        
 
 def build_dep_graph(parent, dep_id_graph, parent_ids, recipe_id_map):
     children = parent.input_info
