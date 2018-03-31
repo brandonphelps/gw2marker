@@ -12,7 +12,6 @@ from enum import Enum
 @timed_cache_data(10  * 60 * 60)
 def get_item_recipe(item_id):
     item_info = get_item_info(item_id)
-    pprint(item_info)
     for i in get_recipe_ids():
         recipe_info = get_recipe_info(i)
         if recipe_info['output_item_id'] == item_id:

@@ -41,6 +41,7 @@ class Uri(Enum):
     character_crafting = ('characters/{}/crafting', True, 1)
     character_recipes = ('characters/{}/recipes', True, 1)
     character_items = ('characters/{}/inventory', True, 1)
+    build = ('build', False)
 
     def __init__(self, path, requires_auth, optional_param_count=0):
         self.path = path
@@ -120,33 +121,75 @@ def timed_cache_data(timeout):
             #print("Current time: {}".format(time.time()))
             # TODO: just lazy, but do a function for writing so it shared, 
             if os.path.isfile(full_path):
-                with open(full_path, 'r') as reader:
-                    timed_result = json.loads(reader.read())
-                # check if we need to write resultant back in since we passed timeout
-                #print(timed_result)
-                if timed_result['rewrite_time'] <= time.time():
+                if os.path.getmtime(full_path) + timeout <= time.time():
                     print("Recomputing: {}({})".format(func.__name__, args))
                     val = func(*args, **kwargs)
-                    timed_result = {'rewrite_time': time.time() + timeout,
-                                    'value' : val}
                     with open(full_path, 'w') as writer:
-                        writer.write(json.dumps(timed_result))
+                        writer.write(json.dumps(val))
                 else:
-                    val = timed_result['value']
+                    with open(full_path, 'r') as reader:
+                        val = json.loads(reader.read())
             else:
+                print("First Computing: {}({})".format(func.__name__, args))
                 val = func(*args, **kwargs)
-                timed_result = {'rewrite_time' : time.time() + timeout,
-                                'value' : val}
-                
                 with open(full_path, 'w') as writer:
-                    writer.write(json.dumps(timed_result))
+                    writer.write(json.dumps(val))
+            return val
+        return inner
+    return wrapper
+
+def get_hash_folder(func, args=None, kwargs=None):
+    inter_folder = func.__name__
+    if args is None:
+        args = []
+    if kwargs is None:
+        kwargs = []
+
+    m = hashlib.sha256()
+    for i in args:
+        m.update(str(i).encode('utf-8'))
+    full_path = os.path.join(cached_folder, inter_folder, m.hexdigest())
+
+    if not os.path.isdir(os.path.dirname(full_path)):
+        os.makedirs(os.path.dirname(full_path))
+    return full_path
+
+def conditional_cache(condi_funct=None, *condi_args, **condi_kwargs):
+    def wrapper(func):
+        def inner(*args, **kwargs):
+            full_path = get_hash_folder(func, args, kwargs)
+            if os.path.isfile(full_path):
+                if condi_funct and condi_funct(*condi_args, **condi_kwargs):
+                    print("Recomputing: {}({})".format(func.__name__, args))
+                    val = func(*args, **kwargs)
+                else:
+                    with open(full_path, 'r') as reader:
+                        val = json.loads(reader.read())
+            else:
+                print("First Computing: {}({})".format(func.__name__, args))
+                val = func(*args, **kwargs)
+                with open(full_path, 'w') as writer:
+                    writer.write(json.dumps(val))
             return val
         return inner
     return wrapper
 
 
-####### data caching
 
+def build_conditional():
+    # fetches the build number, compares it to the stored value, if greater, returns true else false
+    build_num = get_build()['id']
+    full_path = get_hash_folder(build_conditional)
+    value = write_or_load(full_path, build_num)
+    if int(build_num) > int(value):
+        with open(full_path, 'w') as writer:
+            writer.write(str(build_num))
+        return True
+    else:
+        return False
+
+
+####### data caching
 class NoSellsException(Exception):
     # No available sellers
     pass
@@ -160,12 +203,12 @@ def get_item_info(item_id):
     item_info = requester.perform_request(Uri.items, item_id)
     return item_info
 
-@cache_data
+@conditional_cache(build_conditional)
 def get_recipe_ids():
     recipe_ids = requester.perform_request(Uri.recipes)
     return recipe_ids
 
-@cache_data
+@conditional_cache(build_conditional)
 def get_recipe_info(recipe_id):
     recipe_info = requester.perform_request(Uri.recipes, recipe_id)
     return recipe_info
@@ -206,11 +249,11 @@ def get_characters(char=None):
     else:
         return requester.perform_request(Uri.characters)
 
-@cache_data
+@timed_cache_data(60 * 60)
 def get_character_crafting(char_name):
     return requester.perform_request(Uri.character_crafting, char_name)
 
-@cache_data
+@timed_cache_data(60 * 60)
 def get_character_recipes(char_name):
     return requester.perform_request(Uri.character_recipes, char_name)
 
@@ -219,6 +262,10 @@ def get_known_recipes():
 
 def get_all_items():
     return [(j, i) for j in get_characters() for i in get_character_items(j)]
+
+@timed_cache_data(24 * 60 * 60) # one hour
+def get_build():
+    return requester.perform_request(Uri.build)
 
 @timed_cache_data(10 * 60)
 def get_character_items(char_name, collasped=True):
@@ -236,10 +283,15 @@ def get_character_items(char_name, collasped=True):
                             results.append(item['id'])
     return results
 
-@timed_cache_data(10)
-def tester(x):
-    time.sleep(2)
-    return x*10*10*10*(10**10)*(10**10)
+def write_or_load(path, value, init_value=0):
+    if os.path.isfile(path):
+        with open(path, 'r') as reader:
+            return reader.read()
+    else:
+        with open(path, 'w') as writer:
+            writer.write(str(value))
+        return init_value
 
 if __name__ == '__main__':
-    pprint(get_all_items())
+    # pprint(tester(12))
+    pprint(get_recipe_info(20))
