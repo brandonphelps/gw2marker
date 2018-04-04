@@ -1,6 +1,7 @@
 
 from pprint import pprint
 from secrets import key
+import math
 
 from enum import Enum
 import time
@@ -122,19 +123,24 @@ def get_recipe_max_buy_price(recipe_id):
     # print("{}: {}".format(recipe_id, recipe_info))
     return get_item_max_buy_price(recipe_info['output_item_id'])
 
-@timed_cache_data(20 * 60) # 3 minutes
-def get_item_max_buy_price(item_id):
+item_price_time = 10 * 60
+
+@timed_cache_data(item_price_time) # 3 minutes
+def get_item_max_buy_price(item_id, wait=False, reduc=.1):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
     if item_info is None:
         # print("Failed to get item info for id: {}".format(item_id))
         pass
-
-    if item_info and item_info['buys']:
-        return max(item_info['buys'], key=lambda x: int(x['unit_price']))['unit_price']
+    if wait:
+        if item_info and item_info['sells']:
+            value =  min(item_info['sells'], key=lambda x: int(x['unit_price']))['unit_price']
+            return math.floor(value - (reduc * value))
     else:
-        return 0
+        if item_info and item_info['buys']:
+            return max(item_info['buys'], key=lambda x: int(x['unit_price']))['unit_price']
+    return 0
 
-@timed_cache_data(3 * 60) # 3 minutes
+@timed_cache_data(item_price_time) # 3 minutes
 def get_item_min_sell_price(item_id):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
     if item_info is None:
@@ -163,6 +169,7 @@ def get_character_recipes(char_name):
 def get_known_recipes():
     return [(j, i) for j in get_characters() for i in get_character_recipes(j)['recipes']]
 
+@timed_cache_data(10 * 60)
 def get_all_items():
     return [(j, i) for j in get_characters() for i in get_character_items(j)]
 
@@ -187,6 +194,16 @@ def get_character_items(char_name, collasped=True):
                             results.append(item['id'])
     return results
 
+@timed_cache_data(10 * 60)
+def get_account_materials():
+    result = requester.perform_request(Uri.account_materials)
+    results = []
+    print("Account materials")
+    for i in result:
+        if i['count'] > 0:
+            results.append(i['id'])
+    return results
+
 def write_or_load(path, value, init_value=0):
     if os.path.isfile(path):
         with open(path, 'r') as reader:
@@ -198,4 +215,7 @@ def write_or_load(path, value, init_value=0):
 
 if __name__ == '__main__':
     # pprint(tester(12))
-    pprint(get_recipe_info(20))
+    # pprint(get_recipe_info(20))
+
+    pprint(get_account_materials())
+    

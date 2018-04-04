@@ -40,7 +40,8 @@ class LoadedRecipe():
                 print("What did you give me?")
 
     def __str__(self):
-        return "LoadedRecipe: {}".format(str(self.recipe_id))
+        output_item_info = get_item_info(self.output_id)
+        return "LoadedRecipe: {}".format(str(output_item_info['name']))
 
     def __repr__(self):
         return str(self)
