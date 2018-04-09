@@ -12,44 +12,32 @@ def update_table_sub_recip(recip, parent_recipe, table):
         current_parent_buy_price = item_max_buy_table[recipe_item_info['name']]['buy_price']
     else:
         current_parent_buy_price = 0
+        
 
 def update_sell(recipe, parent_recipe_info, table):
     recipe_output_info = get_item_info(recipe.output_id)
     for sub_ing in recipe.input_info:
         if type(sub_ing['value']) == LoadedRecipe:
             item_info = get_item_info(sub_ing['value'].output_id)
-            table[item_info['name']] = {'action' : 'material/buy',
-                                        'parent' : recipe_output_info['name'],
-                                        'count' : sub_ing['count']}
+            if item_info['name'] in table.keys():
+                item_entry = table[item_info['name']]
+                if recipe_output_info['name'] not in item_entry['parent']:
+                    item_entry['parent'].append(recipe_output_info['name'])
+            else:
+                table[item_info['name']] = {'action' : 'material/buy',
+                                            'parent' : [recipe_output_info['name']],
+                                            'count' : sub_ing['count']}
             update_sell(sub_ing['value'], parent_recipe_info, table)
         else:
             item_info = get_item_info(sub_ing['value'])
-
-            table[item_info['name']] = {'action' : 'material/buy',
-                                        'parent' : recipe_output_info['name'],
-                                        'count' : sub_ing['count']}
-
-#            if recipe_item_info['name'] in item_max_buy_table.keys():
-#                current_parent_buy_price = item_max_buy_table[recipe_item_info['name']]['buy_price']
-#            else:
-#                current_parent_buy_price = 0
-#
-#            for recipe_sub_ing in sub_ing['value'].input_info:
-#                if type(recipe_sub_ing['value']) == LoadedRecipe:
-#                    print("Skipping: {}")
-#                else:
-#                    item_info = get_item_info(recipe_sub_ing['value'])
-#                    #pprint(table)
-#                    if item_info['name'] in table.keys() and table[item_info['name']]['parent'] in item_max_buy_table.keys():
-#                        prev_parent_buy_price = item_max_buy_table[table[item_info['name']]['parent']]['buy_price']
-#                    else:
-#                        prev_parent_buy_price = 0
-#
-#                    if current_parent_buy_price > prev_parent_buy_price:
-#                        table[item_info['name']] = {'action' : 'material/buy',
-#                                                    'parent' : recipe_item_info['name'],
-#                                                    'count' : 1}
-
+            if item_info['name'] in table.keys():
+                item_entry = table[item_info['name']]
+                if recipe_output_info['name'] not in item_entry['parent']:
+                    item_entry['parent'].append(recipe_output_info['name'])
+            else:
+                table[item_info['name']] = {'action' : 'material/buy',
+                                            'parent' : [recipe_output_info['name']],
+                                            'count' : sub_ing['count']}
 
 def create_table(recipe_id, table, max_table):
     recipe_info = get_recipe_info(recipe_id)
@@ -62,11 +50,12 @@ def create_table(recipe_id, table, max_table):
             sub_item_info = get_item_info(sub_ing['value'].output_id)
             if sub_ing['value'].recipe_id == recipe_id:
                 table[sub_item_info['name']] = {'action': 'sell',
+                                                'parent': [],
                                                 'count': 1}
             else:
                 if sub_item_info['name'] not in table.keys():
                     table[sub_item_info['name']] = {'action' : 'sell',
-                                                    'parent' : recipe_item_info['name'],
+                                                    'parent' : [recipe_item_info['name']],
                                                     'count' : 1}
             update_sell(sub_ing['value'], recipe_item_info, table)
         else:
@@ -74,7 +63,7 @@ def create_table(recipe_id, table, max_table):
             # todo, do we need to check if the item is already been marked for material/buy for another item? 
             if item_info['name'] not in table.keys():
                 table[item_info['name']] = {'action' : 'sell',
-                                            'parent' : recipe_item_info['name'],
+                                            'parent' : [recipe_item_info['name']],
                                             'count' : sub_ing['count']}
 
 def find_max(recipe, item_buy_table):
