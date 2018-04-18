@@ -106,16 +106,22 @@ def get_obj_id(value):
         return None
 
 def uses_mat(recipe, material_list, depth=1):
+    if type(recipe) == int:
+        recipe = LoadedRecipe(recipe)
+
     recipe_item_info = get_item_info(recipe.output_id)
     a = 1 #debuging
+    return_val = True
     for i in recipe.input_info:
         if get_obj_id(i) in material_list:
             return True
         else:
             if type(i['value']) == LoadedRecipe:
-                return uses_mat(i['value'], material_list, depth+1)
+                if uses_mat(i['value'], material_list, depth + 1):
+                    return True
     else:
         return False
+
 
 def item_in_vault(item_id):
     acc_mats = get_account_materials()
@@ -133,6 +139,15 @@ def get_item_make_price(item_id, recipe_listing):
     else:
         recipe = LoadedRecipe(recipe_id[0])
         return recipe_min_cost(recipe, recipe_listing)
+
+def have_parent_item(item_id, current_recipe_list):
+    for i in current_recipe_list.keys():
+        if uses_mat(get_item_recipe(i)[0], [item_id]):
+            break # already have a recipe which contains this item
+    else:
+        # didn't find a recipe using this item
+        return False
+    return True
 
 def recipe_min_cost(recipe, recipe_listing):
     cost = 0
@@ -156,6 +171,15 @@ def account_has_item(item_id):
             return True
     return False
 
+def have_sell_item(name, list):
+    for j in list:
+        for k in j[1]:
+            if 'make' in k.keys() and name == k['make']:
+                return True
+            elif 'buy' in k.keys() and name == k['buy']:
+                return True
+    return False
+
 def main():
     checked_recipes = []
     max_table = {}
@@ -166,13 +190,12 @@ def main():
             if True or uses_mat(recipe, [19697]):
                 checked_recipes.append(recipe_num)
                 item_info = get_item_info(recipe.output_id)
-                print("Recipe {} contains {}".format(item_info['name'], 19699))
                 create_table(recipe_num, table, max_table)
-    pprint(max_table)
-    print("\n\n")
     items_checked = []
-    print("HERLJERKEJQLRKEJRLWEJR")
     sell_items = []
+    temp_sell_items = {} # a list of items to sell
+    temp_sell_reciped_items = {} # a list of LoadedRecipes to sell
+    mat_sells = []
     for i in max_table.keys():
         if len(max_table[i][1]) == 1:
             if type(max_table[i][1][0]['value']) == LoadedRecipe:
@@ -183,12 +206,62 @@ def main():
                     if value < max_table[item_info['name']][0]:
                         sell_items.append((value, ing_list, max_table[item_info['name']][0], item_info['name']))
                         #print("Sell! {} : cost {} buy {}".format(item_info['name'], max_table[item_info['name']][0], value))
+                        temp_sell_reciped_items[item_info['id']] = i
                         #print(value, ing_list)
+        else:
+            for item_ing in max_table[i][1]:
+                if type(item_ing['value']) == LoadedRecipe:
+                    item_info = get_item_info(item_ing['value'].output_id)
+                    value = recipe_min_cost(item_ing['value'], ing_list)
+                    if (not have_sell_item(item_info['name'], sell_items)) and item_info['name'] in max_table.keys() and value < max_table[item_info['name']][0]:
+                        sell_items.append((value, ing_list, max_table[item_info['name']][0], item_info['name']))
 
-    for i in sorted(sell_items, key=lambda x: x[2]):
-        print("Sell! {}: cost {} buy {}".format(i[3], i[2], i[0]))
-        print("{}\n".format(i[1]))
+                    temp_sell_reciped_items[item_info['id']] = i
+                    for j in item_ing['value'].input_info:
+                        if type(j['value']) == LoadedRecipe:
+                            pass
+                        else:
+                            if j['value'] in temp_sell_items.keys():
+                                mat_sells.append(temp_sell_items[j['value']])
+                                del temp_sell_items[j['value']]
+                else:
+                    if not have_parent_item(item_ing['value'], temp_sell_reciped_items):
+                        temp_sell_items[item_ing['value']] = i
 
+
+    final_results = []
+
+    for i in temp_sell_items:
+        buy_price = 0
+        item_info = get_item_info(i)
+        if item_info['name'] in max_table.keys():
+            buy_price = max_table[item_info['name']][0]
+        else:
+            buy_price = get_item_max_buy_price(i)
+        final_results.append(('base', item_info['name'], buy_price))
+
+    for i in temp_sell_reciped_items:
+        buy_price = 0
+        item_info = get_item_info(i)
+        if item_info['name'] in max_table.keys():
+            buy_price = max_table[item_info['name']][0]
+        else:
+            buy_price = get_item_max_buy_price(i)
+        if item_info['name'] in max_table.keys():
+            final_results.append(('craft', item_info['name'], max_table[item_info['name']][0]))
+        else:
+            print("Failed to find data on item: {}".format(item_info['name']))
+
+    for i in sorted(final_results, key=lambda x: x[2]):
+        if i[0] == 'base':
+            print("Sell basic {} for {}".format(i[1], i[2]))
+        else:
+            print("Sell craft {} for {}".format(i[1], i[2]))
+            print(max_table[i[1]])
+
+
+    for i in mat_sells:
+        print(i)
 
 if __name__ == "__main__":
     table = {}

@@ -123,7 +123,7 @@ def get_recipe_max_buy_price(recipe_id):
     # print("{}: {}".format(recipe_id, recipe_info))
     return get_item_max_buy_price(recipe_info['output_item_id'])
 
-item_price_time = 10 * 60
+item_price_time = 60999 * 60 * 60
 
 @timed_cache_data(item_price_time) # 3 minutes
 def get_item_max_buy_price(item_id, wait=False, reduc=.1):
@@ -164,7 +164,11 @@ def get_character_crafting(char_name):
 
 @timed_cache_data(60 * 60)
 def get_character_recipes(char_name):
-    return requester.perform_request(Uri.character_recipes, char_name)
+    value = requester.perform_request(Uri.character_recipes, char_name) 
+    if not value:
+        value = {'recipes': []}
+        
+    return value
 
 def get_known_recipes():
     return [(j, i) for j in get_characters() for i in get_character_recipes(j)['recipes']]

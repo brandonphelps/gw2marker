@@ -1,5 +1,5 @@
 from data_gathering import get_recipe_info, get_item_max_buy_price, get_item_min_sell_price, get_item_info, get_recipe_ids, timed_cache_data, get_recipe_max_buy_price
-
+from data_gathering import cache_data, build_conditional
 from graphviz import Digraph
 
 from pprint import pprint
@@ -9,7 +9,8 @@ from collections import defaultdict
 from itertools import permutations
 from enum import Enum
 
-@timed_cache_data(10  * 60 * 60)
+# @timed_cache_data(10  * 60 * 60)
+@cache_data(build_conditional)
 def get_item_recipe(item_id):
     item_info = get_item_info(item_id)
     for i in get_recipe_ids():
