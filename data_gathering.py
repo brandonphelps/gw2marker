@@ -123,7 +123,7 @@ def get_recipe_max_buy_price(recipe_id):
     # print("{}: {}".format(recipe_id, recipe_info))
     return get_item_max_buy_price(recipe_info['output_item_id'])
 
-item_price_time = 60999 * 60 * 60
+item_price_time = 10 * 60
 
 @timed_cache_data(item_price_time) # 3 minutes
 def get_item_max_buy_price(item_id, wait=False, reduc=.1):

@@ -47,6 +47,19 @@ class LoadedRecipe():
     def __repr__(self):
         return str(self)
 
+    def uses_mat(self, item_ids):
+        for i in self.input_info:
+            if type(i['value']) == LoadedRecipe:
+                if i['value'].output_id in item_ids:
+                    return True
+                if i['value'].uses_mat(item_ids):
+                    return True
+            else:
+                if i['value'] in item_ids:
+                    return True
+        else:
+            return False
+
     def all_ids(self):
         yield self.recipe_id
         for i in self.input_info:
