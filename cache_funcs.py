@@ -11,13 +11,13 @@ def cache_data(condi_funct=None, *condi_args, **condi_kwargs):
             full_path = get_hash_folder(func, args, kwargs)
             if os.path.isfile(full_path):
                 if condi_funct and condi_funct(*condi_args, **condi_kwargs):
-                    print("Recomputing: {}({})".format(func.__name__, args))
+                    # print("Recomputing: {}({})".format(func.__name__, args))
                     val = func(*args, **kwargs)
                 else:
                     with open(full_path, 'r') as reader:
                         val = json.loads(reader.read())
             else:
-                print("First Computing: {}({})".format(func.__name__, args))
+                # print("First Computing: {}({})".format(func.__name__, args))
                 val = func(*args, **kwargs)
                 with open(full_path, 'w') as writer:
                     writer.write(json.dumps(val))
@@ -44,7 +44,7 @@ def timed_cache_data(timeout):
             # TODO: just lazy, but do a function for writing so it shared, 
             if os.path.isfile(full_path):
                 if os.path.getmtime(full_path) + timeout <= time.time():
-                    print("Recomputing: {}({})".format(func.__name__, args))
+                    # print("Recomputing: {}({})".format(func.__name__, args))
                     val = func(*args, **kwargs)
                     with open(full_path, 'w') as writer:
                         writer.write(json.dumps(val))
@@ -52,7 +52,7 @@ def timed_cache_data(timeout):
                     with open(full_path, 'r') as reader:
                         val = json.loads(reader.read())
             else:
-                print("First Computing: {}({})".format(func.__name__, args))
+                # print("First Computing: {}({})".format(func.__name__, args))
                 val = func(*args, **kwargs)
                 with open(full_path, 'w') as writer:
                     writer.write(json.dumps(val))
