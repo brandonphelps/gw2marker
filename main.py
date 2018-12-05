@@ -6,6 +6,8 @@ from graph_visitor import ItemTreeVisitor, LoadedRecipeVisitor, MinCostVisitor
 from pprint import pprint
 import subprocess
 
+from tqdm import tqdm
+
 item_max_buy_table = {}
 
 item_name_max_buy_table = {}
@@ -72,10 +74,12 @@ class WhatDoResult:
 def update_what_do_table(max_rep, ingredient_item, what_do_table, what_do='Sell'):
     if type(ingredient_item['value']) == LoadedRecipe:
         output_item_info = get_item_info(ingredient_item['value'].output_id)
+        # ing_item_info = get_item_info(ingredient_item['value'])
 
         if output_item_info['name'] not in what_do_table.keys():
             wdr = WhatDoResult(what_do, max_rep.output_item_name())
             what_do_table[output_item_info['name']] = wdr
+            
             parent_table[output_item_info['name']] = max_rep.output_item_name()
             for sub_ing in ingredient_item['value'].input_info:
                 update_what_do_table(max_rep, sub_ing, what_do_table, 'Make {}'.format(output_item_info['name']))
@@ -96,7 +100,7 @@ def test_main():
     used_mats = [get_item_id_by_name("Damask Patch"), get_item_id_by_name("Pile of Crystalline Dust"), get_item_id_by_name("Bag of Starch")
     ]
 
-    for charac, recipe_num in get_known_recipes():
+    for charac, recipe_num in tqdm(get_known_recipes(), desc="Recipes"):
         if recipe_num not in checked_recipes:
             l = LoadedRecipe(recipe_num)
             if not l.uses_mat(used_mats):
