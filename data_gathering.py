@@ -11,7 +11,7 @@ import os
 import json
 
 from functools import lru_cache
-
+from collections import defaultdict
 from cache_funcs import cache_data, timed_cache_data, get_hash_folder
 
 
@@ -33,6 +33,7 @@ def RateLimited(maxPerSecond):
 class Uri(Enum):
     account_materials = ('account/materials', True)
     account_bank = ('account/bank', True)
+    account_inventory = ('account/inventory', True)
     items = ('items/{}', False, 1)
     recipes = ('recipes/{}', False, 1)
     commerce_listings = ('commerce/listings/{}', False, 1)
@@ -102,10 +103,34 @@ class NoBuyException(Exception):
     # No available buyers
     pass
 
+@timed_cache_data(60 * 60 * 24)
+def get_items():
+    """
+    returns a list of item ids
+    """
+    return requester.perform_request(Uri.items)
+
 @cache_data(None)
 def get_item_info(item_id):
     item_info = requester.perform_request(Uri.items, item_id)
     return item_info
+
+def is_item_account_bound(item_id):
+    item_info = get_item_info(item_id)
+    return 'AccountBound' in item_info['flags']
+
+@cache_data(None)
+def is_item_a_base_ing(item_id):
+    pass
+
+@cache_data(None)
+def get_item_id_by_name(item_name):
+    for item_id in get_items():
+        item_info = get_item_info(item_id)
+        if item_info['name'] == item_name:
+            return item_id
+    return None
+
 
 @cache_data(build_conditional)
 def get_recipe_ids():
@@ -123,7 +148,8 @@ def get_recipe_max_buy_price(recipe_id):
     # print("{}: {}".format(recipe_id, recipe_info))
     return get_item_max_buy_price(recipe_info['output_item_id'])
 
-item_price_time = 10 * 60
+item_price_time = 10 * 60 * 3
+
 
 @timed_cache_data(item_price_time) # 3 minutes
 def get_item_max_buy_price(item_id, wait=False, reduc=.1):
@@ -162,15 +188,15 @@ def get_characters(char=None):
 def get_character_crafting(char_name):
     return requester.perform_request(Uri.character_crafting, char_name)
 
+
 @timed_cache_data(60 * 60)
 def get_character_recipes(char_name):
     value = requester.perform_request(Uri.character_recipes, char_name) 
     if not value:
-        value = {'recipes': []}
-        
+        value = {'recipes': []}    
     return value
 
-def get_known_recipes():
+def get_known_recipes(): 
     return [(j, i) for j in get_characters() for i in get_character_recipes(j)['recipes']]
 
 @timed_cache_data(10 * 60)
@@ -181,6 +207,47 @@ def get_all_items():
 def get_build():
     print("Computing get build")
     return requester.perform_request(Uri.build)
+
+
+@timed_cache_data(60 * 2)
+def get_account_bank():
+    return requester.perform_request(Uri.account_bank)
+
+@timed_cache_data(60 * 2)
+def get_raw_character_items(character_name):
+    return requester.perform_request(Uri.character_items, character_name)
+
+@timed_cache_data(60 * 2)
+def get_raw_account_materials():
+    return requester.perform_request(Uri.account_materials)
+
+def get_recipes():
+    return requester.perform_request(Uri.recipes)
+
+# @timed_cache_data(60 * 2)
+def get_account_item_count(item_id):
+    item_counts = defaultdict(int)
+    for character in get_characters():
+        inventory = get_raw_character_items(character)
+        if inventory:
+            for bag in inventory['bags']:
+                if bag:
+                    for item in bag['inventory']:
+                        if item:
+                            item_counts[item['id']] += item['count']
+
+    for item in get_raw_account_materials():
+        if item:
+            item_counts[item['id']] += item['count']
+
+    for item in get_account_bank():
+        if item:
+            item_counts[item['id']] += item['count']
+
+    if item_id:
+        return item_counts[item_id]
+    else:
+        return item_counts
 
 @timed_cache_data(10 * 60)
 def get_character_items(char_name, collasped=True):

@@ -11,7 +11,7 @@ from enum import Enum
 
 # @timed_cache_data(10  * 60 * 60)
 @cache_data(build_conditional)
-def get_item_recipe(item_id):
+def get_item_recipe(item_id, use_known=False):
     item_info = get_item_info(item_id)
     for i in get_recipe_ids():
         recipe_info = get_recipe_info(i)
@@ -22,6 +22,54 @@ def get_item_recipe(item_id):
         # no recipe to make the item, thus return the item
         return (item_id, 'item')
 
+def get_recipe_from_item_id(item_id, use_known=False):
+    s = get_item_recipe(item_id, use_known)
+    if s[1] == 'recipe':
+        return s[0]
+    else:
+        return None
+
+class Item():
+    def __init__(self, item_id):
+        self._item_id = item_id
+        self.name = None
+        self.vendor_value = None
+        self._load_data()
+
+    def get_id(self):
+        return self._item_id
+
+    def _load_data(self):
+        """
+        uses item id to requery server for item info 
+        """
+        t = get_item_info(self._item_id)
+        self.name = t['name']
+        self.vendor_value = t['vendor_value']
+        
+    def __repr__(self):
+        return "Item({})".format(self._item_id)
+
+    def __str__(self):
+        return "Item({})\n\t{}".format(self._item_id, self.name)
+
+class ItemTree():
+    def __init__(self, item_id):
+        print("Item Tree")
+        self.output_item = Item(item_id)
+        print(self.output_item.name)
+        id_value, id_type = get_item_recipe(item_id)
+        self.my_recipe = get_recipe_info(id_value)
+        if self.my_recipe:
+            pprint(self.my_recipe)
+            self.output_count = self.my_recipe['output_item_count']
+            self.input_item_trees = []
+            for ing in self.my_recipe['ingredients']:
+                self.input_item_trees.append(ItemTree(ing['item_id']))
+        
+    def input_trees(self):
+        for i in self.input_item_trees:
+            yield i
 
 class LoadedRecipe():
     def __init__(self, id):
@@ -81,15 +129,61 @@ def build_dep_graph(parent, dep_id_graph, parent_ids, recipe_id_map):
         else:
             dep_id_graph[str(parent.recipe_id)][str(i['value'])] = True
 
-def get_recipe_min_make_price(recipe):
+
+
+def get_recipe_min_make_price(recipe, actions, material_counts=None):
+    t = 0
+
+    for i in recipe.input_info:
+        if type(i['value']) == LoadedRecipe:
+            item_id = i['value'].output_id
+        else:
+            item_id = i['value']
+
+        item_info = get_item_info(item_id)
+        if material_counts:
+            have_amount = material_counts[item_id]
+            if i['count'] <= have_amount:
+                material_counts[item_id] -= i['count']
+                need_amount = 0
+            else:
+                need_amount = i['count'] - have_amount
+        else:
+            need_amount = i['count']
+
+        if type(i['value']) == LoadedRecipe:
+            if need_amount == 0:
+                actions[item_info['name']] = 'Craft'
+            else:
+                recipe_make_price = need_amount * get_recipe_min_make_price(i['value'], actions, material_counts)
+                sell_price = need_amount * get_item_min_sell_price(item_id)
+                if recipe_make_price < sell_price:
+                    actions[item_info['name']] = 'Craft'
+                else:
+                    actions[item_info['name']] = 'Buy'
+                    for sub_item in i['value'].input_info:
+                        if type(sub_item['value']) == LoadedRecipe:
+                            name = get_item_info(sub_item['value'].output_id)['name']
+                        else:
+                            name = get_item_info(sub_item['value'])['name']
+                        del actions[name]
+
+                t += min(recipe_make_price, sell_price)
+        else:
+            if need_amount != 0:
+                actions[item_info['name']] = 'Buy'
+                tmp = need_amount * get_item_min_sell_price(item_id)
+            else:
+                tmp = 0
+            t += tmp
+    return t
+
+
+def test_function(recipe):
     t = 0
     for i in recipe.input_info:
         if type(i['value']) == LoadedRecipe:
-            recipe_make_price = i['count'] * get_recipe_min_make_price(i['value'])
-            sell_price = i['count'] * get_item_min_sell_price(i['value'].output_id)
-            t += min(recipe_make_price, sell_price)
-            if recipe_make_price < sell_price:
-                pass
+            t += test_function(i['value'])
         else:
             t += get_item_min_sell_price(i['value'])
     return t
