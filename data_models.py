@@ -1,5 +1,5 @@
 from data_gathering import get_recipe_info, get_item_max_buy_price, get_item_min_sell_price, get_item_info, get_recipe_ids, timed_cache_data, get_recipe_max_buy_price
-from data_gathering import cache_data, build_conditional
+from data_gathering import cache_data, build_conditional, tp_buy_stock, tp_sell_stock
 from graphviz import Digraph
 
 from pprint import pprint
@@ -53,30 +53,14 @@ class Item():
     def __str__(self):
         return "Item({})\n\t{}".format(self._item_id, self.name)
 
-class ItemTree():
-    def __init__(self, item_id):
-        print("Item Tree")
-        self.output_item = Item(item_id)
-        print(self.output_item.name)
-        id_value, id_type = get_item_recipe(item_id)
-        self.my_recipe = get_recipe_info(id_value)
-        if self.my_recipe:
-            pprint(self.my_recipe)
-            self.output_count = self.my_recipe['output_item_count']
-            self.input_item_trees = []
-            for ing in self.my_recipe['ingredients']:
-                self.input_item_trees.append(ItemTree(ing['item_id']))
-        
-    def input_trees(self):
-        for i in self.input_item_trees:
-            yield i
-
 class LoadedRecipe():
     def __init__(self, id):
         self.recipe_id = id
         recipe_info = get_recipe_info(self.recipe_id)
         self.output_id = recipe_info['output_item_id']
         self.input_info = []
+        self.output_item_count = recipe_info['output_item_count']
+
         for ing in recipe_info['ingredients']:
             id_value, id_type = get_item_recipe(ing['item_id'])
             if id_type == "recipe":
@@ -95,6 +79,19 @@ class LoadedRecipe():
     def __repr__(self):
         return str(self)
 
+    def immediate_use_mat(self, item_ids):
+        for i in self.input_info:
+            if type(i['value']) == LoadedRecipe:
+                if i['value'].output_id in item_ids:
+                    return True
+            else:
+                if i['value'] in item_ids:
+                    return True
+        else:
+            return False
+
+
+
     def uses_mat(self, item_ids):
         for i in self.input_info:
             if type(i['value']) == LoadedRecipe:
@@ -108,6 +105,22 @@ class LoadedRecipe():
         else:
             return False
 
+    def immediate_mat_list(self):
+        for i in self.input_info:
+            if type(i['value']) == LoadedRecipe:
+                yield i['value'].output_id
+            else:
+                yield i['value']
+
+    def all_item_ids(self):
+        yield self.output_id
+        for i in self.input_info:
+            if type(i['value']) == LoadedRecipe:
+                for j in i['value'].all_item_ids():
+                    yield j
+            else:
+                yield i['value']
+
     def all_ids(self):
         yield self.recipe_id
         for i in self.input_info:
@@ -116,6 +129,63 @@ class LoadedRecipe():
                     yield j
             else:
                 yield i['value']
+
+class TPItemStock:
+    def __init__(self, item_id, dir='buy'):
+        self._item_id = item_id
+        self._item_info = get_item_info(self._item_id)
+        self._dir = dir
+
+        if dir == 'buy':
+            self.items_holder = tp_buy_stock(self._item_id)
+        else:
+            self.items_holder = tp_sell_stock(self._item_id)
+        self.items_holder.sort(key=lambda x: x['unit_price'], reverse = dir == 'buy')
+        self._supply = 0
+        for i in self.items_holder:
+            self._supply += i['quantity']
+
+    def consume(self, amount):
+        consume_amount = min(self.supply(), amount)
+        while consume_amount > 0 and self._supply > 0:
+            self.items_holder[0]['quantity'] -= 1
+            self._supply -= 1
+            if self.items_holder[0]['quantity'] == 0:
+                self.items_holder.pop(0)
+            consume_amount -= 1
+
+    def supply(self):
+        return self._supply
+
+    def current_price(self, peek=0):
+        if self.items_holder:
+
+            index = 0
+            if peek < 0:
+                peek = 0
+
+            while peek >= 0 and index < len(self.items_holder):
+                if peek > self.items_holder[index]['quantity']:
+                    peek -= self.items_holder[index]['quantity']
+                    index += 1
+                else:
+                    return self.items_holder[index]['unit_price']
+            if self._dir == 'buy':
+                return 0
+            else:
+                return 100000000
+        else:
+            if self._dir == 'buy':
+                return 0
+            else:
+                return 1000000000
+
+    def current_amount_left(self):
+        return self.items_holder[0]['quantity']
+
+    def __str__(self):
+        return "{}: {} {}".format(self._item_info['name'], self._dir, self.items_holder[0]['unit_price'])
+
 
 
 def build_dep_graph(parent, dep_id_graph, parent_ids, recipe_id_map):

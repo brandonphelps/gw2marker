@@ -86,6 +86,11 @@ def cheapest_crafting(l, tp_dict, account_mats, opts=None):
     for info in l.input_info:
         item_id = blakfj(info)
         for c in range(info['count']):
+            if temp_acc_mats[item_id] > opts['use'][item_id]:
+                have_cost = tp_dict['buy'][item_id].current_price(opts['use'][item_id])
+            else:
+                have_cost = 100000000
+
             buy_cost = tp_dict['sell'][item_id].current_price(opts['buy'][item_id])
 
             sub_item_recipe, id_type = get_item_recipe(item_id)
@@ -104,11 +109,6 @@ def cheapest_crafting(l, tp_dict, account_mats, opts=None):
                 print(f"Item {get_item_info(item_id)['name']}")
                 craft_cost = 1000000000
                 
-            if buy_cost < have_cost:
-                min_cost += buy_cost
-                opts['buy'][item_id] += 1
-                
-
             if have_cost < buy_cost:
                 if have_cost < craft_cost:
                     min_cost += have_cost

@@ -17,8 +17,9 @@ def cache_data(condi_funct=None, *condi_args, **condi_kwargs):
                     with open(full_path, 'r') as reader:
                         val = json.loads(reader.read())
             else:
-                # print("First Computing: {}({})".format(func.__name__, args))
+                print("First Computing: {}({})".format(func.__name__, args))
                 val = func(*args, **kwargs)
+                print(val)
                 with open(full_path, 'w') as writer:
                     writer.write(json.dumps(val))
             return val

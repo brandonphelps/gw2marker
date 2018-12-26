@@ -118,7 +118,7 @@ class LoadedRecipeVisitor(GraphVisitor):
                     left_over_count = -1 * total_item_count
                     total_item_count = 0
                 if only_needed and total_item_count == 0:
-                    pass
+                    continue
 
             if isinstance(i['value'], LoadedRecipe):
                 if sub_mat_count:
