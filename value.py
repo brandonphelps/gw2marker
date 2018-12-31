@@ -67,79 +67,56 @@ def recipe_output_value(l, tp_dict, account_mats):
 
 
 
-
-
-
-
 def cheapest_crafting(l, tp_dict, account_mats, opts=None):
 
     temp_acc_mats = key_dependent_dict(lambda x: get_account_item_count(x))
     temp_acc_mats.update(account_mats)
 
     if opts is None:
-        opts = {'buy' : defaultdict(int), 'use' : defaultdict(int), 'craft' : defaultdict(int)}
+        opts = {'buy' : defaultdict(int), 'craft' : defaultdict(int)}
 
     min_cost = 0
-
-
 
     for info in l.input_info:
         item_id = blakfj(info)
         for c in range(info['count']):
+
             if temp_acc_mats[item_id] > opts['use'][item_id]:
                 have_cost = tp_dict['buy'][item_id].current_price(opts['use'][item_id])
             else:
-                have_cost = 100000000
-
+                have_cost = 1000000000000
+            
             buy_cost = tp_dict['sell'][item_id].current_price(opts['buy'][item_id])
 
             sub_item_recipe, id_type = get_item_recipe(item_id)
             if id_type == 'recipe':
                 print(f"Crafted Item {get_item_info(item_id)['name']}")
-                sub_opts = {'buy' : defaultdict(int), 'use' : defaultdict(int), 'craft' : defaultdict(int)}
-                for i in opts['buy']:
-                    sub_opts['buy'][i] = opts['buy'][i]
-                    print(sub_opts['buy'][i])
-                for i in sub_opts['use']:
-                    sub_opts['use'][i] = opts['use'][i]
-                for i in sub_opts['craft']:
-                    sub_opts['craft'][i] = opts['craft'][i]
+                sub_opts = {'buy' : defaultdict(int), 'craft' : defaultdict(int), 'use' : defaultdict(int)}
+                
+
+                #for i in opts['buy']:
+                #    sub_opts['buy'][i] = opts['buy'][i]
+                #    print(sub_opts['buy'][i])
+                #for i in sub_opts['use']:
+                #    sub_opts['use'][i] = opts['use'][i]
+                #for i in sub_opts['craft']:
+                #    sub_opts['craft'][i] = opts['craft'][i]
                 craft_cost = cheapest_crafting(LoadedRecipe(sub_item_recipe), tp_dict, account_mats, sub_opts)
             else:
                 print(f"Item {get_item_info(item_id)['name']}")
                 craft_cost = 1000000000
                 
-            if have_cost < buy_cost:
-                if have_cost < craft_cost:
-                    min_cost += have_cost
-                    opts['use'][item_id] += 1
-                else:
-                    min_cost += craft_cost
-                    opts['craft'][item_id] += 1
-                    for i in sub_opts['buy']:
-                        opts['buy'][i] = sub_opts['buy'][i]
-                    for i in sub_opts['use']:
-                        opts['use'][i] = sub_opts['use'][i]
-                    for i in sub_opts['craft']:
-                        opts['craft'][i] = sub_opts['craft'][i]
+            if buy_cost < craft_cost:
+                min_cost += buy_cost
+                opts['buy'][item_id] += 1
             else:
-                if buy_cost < craft_cost:
-                    min_cost += buy_cost
-                    opts['buy'][item_id] += 1
-                else:
-                    min_cost += craft_cost
-                    opts['craft'][item_id] += 1
-                    for i in sub_opts['buy']:
-                        opts['buy'][i] = sub_opts['buy'][i]
-                    for i in sub_opts['use']:
-                        opts['use'][i] = sub_opts['use'][i]
-                    for i in sub_opts['craft']:
-                        opts['craft'][i] = sub_opts['craft'][i]
+                min_cost += buy_cost
+                opts['craft'][item_id] += 1
+                for i in sub_opts['buy']:
+                    opts['buy'][i] = sub_opts['buy'][i]
+                for i in sub_opts['craft']:
+                    opts['craft'][i] = sub_opts['craft'][i]
     return min_cost
-
-
-
-
 
 
 
@@ -472,14 +449,14 @@ def main():
 
     mat_ids =  [get_item_id_by_name(i) for i in mat_names]
 
-    mats = {'buy' : defaultdict(int), 'use' : defaultdict(int), 'craft' : defaultdict(int)}
-    #value = cheapest_crafting(LoadedRecipe(get_item_recipe(get_item_id_by_name("Malign Bronze Axe"))[0]), build_tp_dict(mat_ids), build_account_mat_count(mat_ids), mats)
-    #print(value)
-    #for i in mats:
-    #    print(f'Opt: {i}')
-    #    for opt in mats[i]:
-    #        print(f"Item: {get_item_info(opt)['name']}: {mats[i][opt]}")
-    #exit(1)
+    mats = {'buy' : defaultdict(int), 'craft' : defaultdict(int)}
+    value = cheapest_crafting(LoadedRecipe(get_item_recipe(get_item_id_by_name("Malign Bronze Axe"))[0]), build_tp_dict(mat_ids), build_account_mat_count(mat_ids), mats)
+    print(value)
+    for i in mats:
+        print(f'Opt: {i}')
+        for opt in mats[i]:
+            print(f"Item: {get_item_info(opt)['name']}: {mats[i][opt]}")
+    exit(1)
     for index, id in enumerate(mat_ids):
         if id is None:
             print(f"Unable to find id for {mat_names[index]}")
