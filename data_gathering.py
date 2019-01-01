@@ -82,6 +82,7 @@ class GW2Request:
 
 requester = GW2Request('v2')
 
+
 def build_conditional():
     # fetches the build number, compares it to the stored value, if greater, returns true else false
     build_num = get_build()['id']
@@ -121,10 +122,6 @@ def is_item_account_bound(item_id):
     return 'AccountBound' in item_info['flags']
 
 @cache_data(None)
-def is_item_a_base_ing(item_id):
-    pass
-
-@cache_data(None)
 def get_item_id_by_name(item_name):
     for item_id in get_items():
         item_info = get_item_info(item_id)
@@ -146,10 +143,11 @@ def get_recipe_info(recipe_id):
 @cache_data(None)
 def get_recipe_max_buy_price(recipe_id):
     recipe_info = get_recipe_info(recipe_id)
-    # print("{}: {}".format(recipe_id, recipe_info))
     return get_item_max_buy_price(recipe_info['output_item_id'])
 
-@cache_data(None)
+time_cache_interval = 3 * 60 
+
+@timed_cache_data(time_cache_interval)
 def tp_buy_stock(item_id):
     r = requester.perform_request(Uri.commerce_listings, item_id)
     if r:
@@ -157,7 +155,7 @@ def tp_buy_stock(item_id):
     else:
         return []
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def tp_sell_stock(item_id):
     r = requester.perform_request(Uri.commerce_listings, item_id)
     if r:
@@ -165,7 +163,7 @@ def tp_sell_stock(item_id):
     else:
         return []
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def tp_instant_stock_info(item_id):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
 
@@ -174,7 +172,7 @@ def tp_instant_stock_info(item_id):
     else:
         return []
 
-@cache_data(None) 
+@timed_cache_data(time_cache_interval) 
 def get_item_max_buy_price(item_id, wait=False, reduc=.1):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
     if item_info is None:
@@ -189,7 +187,7 @@ def get_item_max_buy_price(item_id, wait=False, reduc=.1):
             return max(item_info['buys'], key=lambda x: int(x['unit_price']))['unit_price']
     return 0
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_item_min_sell_price(item_id):
     item_info = requester.perform_request(Uri.commerce_listings, item_id)
     if item_info is None:
@@ -205,14 +203,16 @@ def get_characters(char=None):
     if char:
         return requester.perform_request(Uri.characters, char)
     else:
-        return requester.perform_request(Uri.characters)
+        t = requester.perform_request(Uri.characters)
+        print(t)
+        return t
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_character_crafting(char_name):
     return requester.perform_request(Uri.character_crafting, char_name)
 
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_character_recipes(char_name):
     value = requester.perform_request(Uri.character_recipes, char_name) 
     if not value:
@@ -222,7 +222,7 @@ def get_character_recipes(char_name):
 def get_mystic_forge_recipes():
     return []
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_known_recipes():
     recipes = []
     for j in get_characters():
@@ -230,29 +230,27 @@ def get_known_recipes():
         recipes.extend(get_character_recipes(j)['recipes'])
     return recipes
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_all_items():
     return [(j, i) for j in get_characters() for i in get_character_items(j)]
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_build():
-    print("Computing get build")
     return requester.perform_request(Uri.build)
 
-
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_account_bank():
     return requester.perform_request(Uri.account_bank)
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_raw_character_items(character_name):
     return requester.perform_request(Uri.character_items, character_name)
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_raw_account_materials():
     return requester.perform_request(Uri.account_materials)
 
-@cache_data(None)
+@timed_cache_data(time_cache_interval)
 def get_recipes():
     return [(None, recipe_id) for recipe_id in requester.perform_request(Uri.recipes)]
 
@@ -280,7 +278,7 @@ def get_account_item_count(item_id):
     else:
         return item_counts
 
-@cache_data(70 * 60)
+@timed_cache_data(time_cache_interval)
 def get_character_items(char_name, collasped=True):
     result = requester.perform_request(Uri.character_items, char_name)
     #pprint(result)
@@ -296,7 +294,7 @@ def get_character_items(char_name, collasped=True):
                             results.append(item['id'])
     return results
 
-@cache_data(70 * 60)
+@timed_cache_data(time_cache_interval)
 def get_account_materials():
     result = requester.perform_request(Uri.account_materials)
     results = []

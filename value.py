@@ -90,24 +90,16 @@ def cheapest_crafting(l, tp_dict, account_mats, opts=None):
 
             sub_item_recipe, id_type = get_item_recipe(item_id)
             if id_type == 'recipe':
-                print(f"Crafted Item {get_item_info(item_id)['name']}")
                 sub_opts = {'buy' : defaultdict(int), 'craft' : defaultdict(int), 'use' : defaultdict(int)}
                 for i in opts['buy']:
                     sub_opts['buy'][i] = opts['buy'][i]
-                    print(sub_opts['buy'][i])
                 for i in sub_opts['use']:
                     sub_opts['use'][i] = opts['use'][i]
                 for i in sub_opts['craft']:
                     sub_opts['craft'][i] = opts['craft'][i]
                 craft_cost = cheapest_crafting(LoadedRecipe(sub_item_recipe), tp_dict, account_mats, sub_opts)
             else:
-                print(f"Item {get_item_info(item_id)['name']}")
                 craft_cost = 1000000000
-
-
-            
-
-
                 
             if buy_cost < craft_cost:
                 if have_cost < buy_cost:
@@ -131,84 +123,6 @@ def cheapest_crafting(l, tp_dict, account_mats, opts=None):
                         opts['use'][i] = sub_opts['use'][i]
                     
     return min_cost
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def recipe_input_value(l, tp_dict, account_mats):
-    cost = 0
-    gain = 0
-    mats = {'buy' : defaultdict(int), 'use' : defaultdict(int), 'craft' : defaultdict(int)}
-    for info in l.input_info:
-        item_id = blakfj(info)
-        # TODO MAKE RECURSIVE FOR MINIMUM ITEM CRAFT COST
-        for c in range(info['count']):
-            have_cost = 0
-            have_gain = 0
-
-            buy_cost = 0
-            buy_gain = 0
-
-            craft_cost = 0
-            craft_gain = 0
-
-            if account_mats[item_id] > c:
-                # mats['use'][item_id] += 1
-                have_cost = tp_dict['buy'][item_id].current_price()
-                have_gain = tp_dict['buy'][item_id].current_price()
-            else:
-                have_cost = 100000000
-                have_gain = 0
-
-            # mats['buy'][item_id] += 1
-            buy_cost = tp_dict['sell'][item_id].current_price()
-            buy_gain = tp_dict['buy'][item_id].current_price()
-            opt = None
-            if have_cost < buy_cost:
-                opt = 'have'
-                #if not (have_cost < craft_cost):
-                #    opt = 'craft'
-            else: # craft cost <= have_cost
-                opt = 'buy'
-                #if craft_cost < buy_cost:
-                #    opt = 'craft'
-
-            assert opt != None
-
-            if opt == 'have':
-                cost += have_cost
-                gain += have_gain
-                mats['use'][item_id] += 1
-            elif opt == 'buy':
-                cost += buy_cost
-                gain += buy_gain
-                mats['buy'][item_id] += 1
-            elif opt == 'craft':
-                cost += craft_cost
-                gain += craft_gain
-                for i in craft_mats['use']:
-                    mats['use'][i] += craft_mats['use'][i]
-                for i in craft_mats['buy']:
-                    mats['buy'][i] += craft_mats['buy'][i]
-                mats['craft'][item_id] += 1
-            #print(get_item_info(item_id)['name'], gain, cost)
-    return cost, gain, mats
 
 def value(sell_list, tp_dict=None):
     mat_ids = [item_id for item_id, count in sell_list.items()]
@@ -250,7 +164,6 @@ def generate_sell_list(base_mat_ids, dont_sell_list=None, process_count_limit=10
         else:
             seen_recipes.append(l.recipe_id)
         available_output_items[l.output_id] = l
-        print(get_item_info(l.output_id)['name'])
         available_recipes.append(l)
 
     print("Building material counts")
@@ -279,7 +192,9 @@ def generate_sell_list(base_mat_ids, dont_sell_list=None, process_count_limit=10
         
         for item_id in available_output_items.keys():
             if available_output_items[item_id]:
-                input_cost, input_gain, consume_mats = recipe_input_value(available_output_items[item_id], tp_dict, mat_account_counts)
+                consume_mats = {'buy' : defaultdict(int), 'craft' : defaultdict(int), 'use' : defaultdict(int)}
+                input_cost = cheapest_crafting(available_output_items[item_id], tp_dict, mat_account_counts, consume_mats)
+                
                 output_gain = recipe_output_value(available_output_items[item_id], tp_dict, mat_account_counts)
 
                 if mat_account_counts[item_id] > 0: # todo thoughts?
@@ -345,6 +260,7 @@ def generate_sell_list(base_mat_ids, dont_sell_list=None, process_count_limit=10
     cont = True
     process_count = 0
     total_pro = 0
+    t1 = 0
     while t >= cut_off and cont and process_count < process_count_limit:
         t, crafted_item, tmp_pro = helper()
         total_pro += tmp_pro
@@ -356,6 +272,10 @@ def generate_sell_list(base_mat_ids, dont_sell_list=None, process_count_limit=10
                 break
         if crafted_item != 0:
             print(f"Created: {get_item_info(crafted_item)['name']}: {total_resource_usage['sell'][crafted_item]}")
+            t2 = time.time()
+            if t2 > t1:
+                print(f"Took {(t2-t1)/60} minutes {t} >= {cut_off} {process_count} < {process_count_limit}")
+                t1 = time.time()
         else:
             cont = False
 
@@ -463,14 +383,14 @@ def main():
 
     mat_ids =  [get_item_id_by_name(i) for i in mat_names]
 
-    mats = {'buy' : defaultdict(int), 'craft' : defaultdict(int), 'use' : defaultdict(int)}
-    value = cheapest_crafting(LoadedRecipe(get_item_recipe(get_item_id_by_name("Malign Bronze Axe"))[0]), build_tp_dict(mat_ids), build_account_mat_count(mat_ids), mats)
-    print(value)
-    for i in mats:
-        print(f'Opt: {i}')
-        for opt in mats[i]:
-            print(f"Item: {get_item_info(opt)['name']}: {mats[i][opt]}")
-    exit(1)
+    #mats = {'buy' : defaultdict(int), 'craft' : defaultdict(int), 'use' : defaultdict(int)}
+    #value = cheapest_crafting(LoadedRecipe(get_item_recipe(get_item_id_by_name("Malign Bronze Axe"))[0]), build_tp_dict(mat_ids), build_account_mat_count(mat_ids), mats)
+    #print(value)
+    #for i in mats:
+    #    print(f'Opt: {i}')
+    #    for opt in mats[i]:
+    #        print(f"Item: {get_item_info(opt)['name']}: {mats[i][opt]}")
+    #exit(1)
     for index, id in enumerate(mat_ids):
         if id is None:
             print(f"Unable to find id for {mat_names[index]}")
@@ -479,7 +399,7 @@ def main():
     dont_sell_amounts = [('Bolt of Jute', 100), ("Jute Scrap", 170), ("Stretched Rawhide Leather Square", 100), ("Rawhide Leather Section", 100)]
     ids_dont_sells = {get_item_id_by_name(mat_name) : count for mat_name, count in dont_sell_amounts}
     mat_ids = [get_item_id_by_name(item_name) for item_name in mat_names]
-    generate_sell_list(mat_ids, ids_dont_sells, 4000, .5)
+    generate_sell_list(mat_ids, ids_dont_sells, 4000)
     
 
 if __name__ == "__main__":
