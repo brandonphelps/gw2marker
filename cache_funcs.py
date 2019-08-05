@@ -52,7 +52,7 @@ def timed_cache_data(timeout):
                     with open(full_path, 'r') as reader:
                         val = json.loads(reader.read())
             else:
-                # print("First Computing: {}({})".format(func.__name__, args))
+                print("First Computing: {}({})".format(func.__name__, args))
                 val = func(*args, **kwargs)
                 with open(full_path, 'w') as writer:
                     writer.write(json.dumps(val))

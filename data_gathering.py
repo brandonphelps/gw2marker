@@ -58,7 +58,6 @@ class GW2Request:
 
     def __init__(self, version):
         self.version = version
-        self.uri = None
 
     def perform_request(self, option, *args):
         uri = "{}/{}/{}".format(self.base_url, self.version, option.path)
@@ -75,13 +74,10 @@ class GW2Request:
         return self._perform_request(uri)
 
     def _perform_request(self, uri):
-        print(self.uri)
-        self.uri = uri
-        r = requests.get(self.uri)
+        r = requests.get(uri)
         if r:
             return r.json()
         return None
-
 
 requester = GW2Request('v2')
 
@@ -319,21 +315,22 @@ def get_character_items(char_name, collasped=True, binding_filter=None):
 
 	return results
 
-@timed_cache_data(time_cache_interval * 30)
-def get_account_equipable_items(binding_filter):
+
+def get_account_equipable_items():
 	return [(j, i) for j in get_characters()
 	        for i in get_equipable_items_with_stats(j)]
 
+@timed_cache_data(time_cache_interval * 30)
 def get_equipable_items_with_stats(char_name):
 	results = []
 
 	def is_item_equipable(item_id):
 		item_info = get_item_info(item_id)
-		item_info and (item_info['type'] == 'Armor' or
-		               item_info['type'] == 'Back' or
-		               item_info['type'] == 'Weapon' or
-		               item_info['type'] == 'Trinket')
-
+		return item_info and (item_info['type'] == 'Armor' or
+		                      item_info['type'] == 'Back' or
+		                      item_info['type'] == 'Weapon' or
+		                      item_info['type'] == 'Trinket')
+	
 	def get_result_from_item_info(item_info):
 		new_item_info = get_item_info(item_info['id'])
 		if 'stats' in item_info:
@@ -343,7 +340,7 @@ def get_equipable_items_with_stats(char_name):
 			for attrib in item_info['stats']['attributes']:
 				attribs.append({'attribute': attrib,
 				                'modifier' : item_info['stats']['attributes'][attrib]})
-			new_item_info['details']['infix_upgrades'] = {'attributes': attribs}
+			new_item_info['details']['infix_upgrade'] = {'attributes': attribs}
 		return new_item_info
 
 	result = requester.perform_request(Uri.character_items, char_name)

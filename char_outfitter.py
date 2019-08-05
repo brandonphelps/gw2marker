@@ -15,7 +15,6 @@ def equipment_score(item_info: dict, weights):
 	"""
 	item_info, dict: should be obtained from get_item_info function
 	"""
-	print(item_info['name'], item_info)
 	if 'infix_upgrade' in item_info['details']:
 		item_attributes = item_info['details']['infix_upgrade']['attributes']
 
@@ -31,35 +30,19 @@ def equipment_score(item_info: dict, weights):
 			weight = 0
 		score += attrib['modifier'] * weight
 	return score
-
-def attribute_manhat_dist(attribute1, attribute2, weights=None):
-	attribute_one_data = {}
-	attribute_two_data = {}
-	if weights is None:
-		weights = {}
-
-	for attr in attribute1:
-		assert attr['attribute'] not in attribute_one_data
-		attribute_one_data[attr['attribute']] = attr
-
-	for attr in attribute2:
-		assert attr['attribute'] not in attribute_two_data
-		attribute_two_data[attr['attribute']] = attr
-
-	value = 0
-	for key in set(list(attribute_one_data.keys()) + list(attribute_two_data.keys())):
-		l_m_value, l_v_value = 0, 0
-		r_m_value, r_v_value = 0, 0
-
-		if key in attribute_one_data:
-			l_m_value, l_v_value = attribute_one_data[key]['multiplier'], attribute_one_data[key]['value']
-		if key in attribute_two_data:
-			r_m_value, r_v_value = attribute_two_data[key]['multiplier'], attribute_two_data[key]['value']
-
-		value += math.fabs(l_m_value - r_m_value) + math.fabs(l_v_value - r_v_value)
-
-	return value
 	
+def get_account_trinket_filter(slot_type):
+	"""
+	slot_type, str: 
+	Accessory – Accessory
+    Amulet – Amulet
+    Ring – Ring
+	"""
+	for toon_name, item_info in get_account_equipable_items():
+		if (item_info['type'] == 'Trinket' and
+		    item_info['details']['type'] == slot_type):
+			yield (toon_name, item_info)
+
 def get_account_armor_filter(slot_type, weight_class):
 	"""
 	slot_type, str: type to filter on for armor. 
@@ -80,32 +63,46 @@ def get_account_armor_filter(slot_type, weight_class):
 	"""
 
 	# binding_filter, don't exclude anything
-	for toon_name, item_info in get_account_equipable_items(binding_filter=[]):
+	for toon_name, item_info in get_account_equipable_items():
 		if (item_info['type'] == 'Armor' and
 		    item_info['details']['type'] == slot_type and
 		    item_info['details']['weight_class'] == weight_class):
+			yield (toon_name, item_info)
+
+def get_account_weapon_filter(type):
+	"""
+	type, str:
+	One-handed main hand: Axe, Dagger, Mace, Pistol, Scepter, Sword
+    One-handed off hand: Focus, Shield, Torch, Warhorn
+    Two-handed: Greatsword, Hammer, LongBow, Rifle, ShortBow, Staff
+    Aquatic: Harpoon, Speargun, Trident
+    Other: LargeBundle, SmallBundle, Toy, ToyTwoHanded
+	"""
+	for toon_name, item_info in get_account_equipable_items():
+		if (item_info['type'] == 'Weapon' and
+		    item_info['details']['type'] == type):
 			yield (toon_name, item_info)
 
 light_helm_armors = get_account_armor_filter('Helm', 'Light')
 light_coat_armors = get_account_armor_filter('Coat', 'Light')
 light_shoulders_armors = get_account_armor_filter('Shoulders', 'Light')
 light_gloves_armors = get_account_armor_filter('Gloves', 'Light')
-light_leggings_armors = get_account_armor_filter('Leggins', 'Light')
+light_leggings_armors = get_account_armor_filter('Leggings', 'Light')
 light_boots_armors = get_account_armor_filter('Boots', 'Light')
-
 light_armors = itertools.chain(light_helm_armors, light_coat_armors, light_shoulders_armors, light_gloves_armors, light_leggings_armors, light_boots_armors)
+ring_armors = get_account_trinket_filter('Ring')
+amulet_armors = get_account_trinket_filter('Amulet')
+accessory_armors = get_account_trinket_filter('Accessory')
+axe_weapons = get_account_weapon_filter('Axe')
+sword_weapons = get_account_weapon_filter('Sword')
+dagger_weapons = get_account_weapon_filter('Dagger')
 
-def get_best_equipment_for(slot, attribute_weights, filter_func):
-	best_item = None
-	best_score = 0
-	print(slot)
-	for toon_name, item_info in filter_func:
-		item_score = equipment_score(item_info, attribute_weights)
-		print("\t", item_info['name'], item_score)
-		if item_score > best_score:
-			best_item = item_info
-			best_score = item_score
-	return best_item, best_score
+def get_best_equipment_for(filter_func, attribute_weights, count):
+
+	item_list_with_score = [(toon_name, item_info, equipment_score(item_info, attribute_weights)) for toon_name, item_info in filter_func]
+	
+	for count, toon_item_info_score in zip(range(count), sorted(item_list_with_score, key=lambda x: x[2], reverse=True)):
+		yield toon_item_info_score
 
 def get_best_equipment():
 	attribute_weights = {'Power': 0.3,
@@ -113,17 +110,22 @@ def get_best_equipment():
 	                     'Healing': 0.3,
 	                     'ConditionDamage': 0.165}
 
-	for category, filter in [('Helm', light_helm_armors),
-	                         ('Shoulders', light_shoulders_armors),
-	                         ('Coat', light_coat_armors),
-	                         ('Gloves', light_gloves_armors),
-	                         ('Leggins', light_leggings_armors),
-	                         ('Boots', light_boots_armors)]:
-		item_info, best_equipement = get_best_equipment_for(category, attribute_weights, filter)
-		if item_info:
-			print(f"{category}: {item_info['name']} {best_equipement}")
-		else:
-			print(f"{category}: {item_info} {best_equipement}")
+	for category, filter, count in [('Helm', light_helm_armors, 1),
+	                                ('Shoulders', light_shoulders_armors, 1),
+	                                ('Coat', light_coat_armors, 1),
+	                                ('Gloves', light_gloves_armors, 1),
+	                                ('Leggings', light_leggings_armors, 1),
+	                                ('Boots', light_boots_armors, 1),
+	                                ('Ring', ring_armors, 2),
+	                                ('Amulet', amulet_armors, 2),
+	                                ('Sword', sword_weapons, 4),
+	                                ('Dagger', dagger_weapons, 2)]:
+
+		for toon_name, item_info, score in get_best_equipment_for(filter, attribute_weights, count):
+			if item_info:
+				print(f"{category}: {item_info['name']} {score}")
+			else:
+				print(f"{category}: {item_info}")
 
 def main():
 	get_best_equipment()
