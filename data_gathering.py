@@ -35,6 +35,8 @@ class Uri(Enum):
     account_bank = ('account/bank', True)
     account_inventory = ('account/inventory', True)
     items = ('items/{}', False, 1)
+    item_stats = ('itemstats/{}', False, 1)
+    item_stats_all = ('itemstats', False, 0)
     recipes = ('recipes/{}', False, 1)
     commerce_listings = ('commerce/listings/{}', False, 1)
     commerce_prices = ('commerce/prices/{}', False, 1)
@@ -42,6 +44,7 @@ class Uri(Enum):
     character_crafting = ('characters/{}/crafting', True, 1)
     character_recipes = ('characters/{}/recipes', True, 1)
     character_items = ('characters/{}/inventory', True, 1)
+    character_equipment = ('characters/{}/equipment', True, 1)
     build = ('build', False)
 
     def __init__(self, path, requires_auth, optional_param_count=0):
@@ -68,7 +71,7 @@ class GW2Request:
                 uri = uri.replace('{', '').replace('}', '')
         if option.requires_auth:
             uri += "?access_token={}".format(key)
-
+        print(uri)
         return self._perform_request(uri)
 
     def _perform_request(self, uri):
@@ -100,7 +103,7 @@ def build_conditional():
 class NoSellsException(Exception):
     # No available sellers
     pass
-    
+
 class NoBuyException(Exception):
     # No available buyers
     pass
@@ -116,6 +119,16 @@ def get_items():
 def get_item_info(item_id):
     item_info = requester.perform_request(Uri.items, item_id)
     return item_info
+
+@cache_data(None)
+def get_item_stat_ids():
+	item_info = requester.perform_request(Uri.item_stats_all)
+	return item_info
+
+@cache_data(None)
+def get_item_stats(stat_id):
+	item_info = requester.perform_request(Uri.item_stats, stat_id)
+	return item_info
 
 def is_item_account_bound(item_id):
     item_info = get_item_info(item_id)
@@ -230,9 +243,13 @@ def get_known_recipes():
         recipes.extend(get_character_recipes(j)['recipes'])
     return recipes
 
-@timed_cache_data(time_cache_interval)
-def get_all_items():
-    return [(j, i) for j in get_characters() for i in get_character_items(j)]
+@timed_cache_data(time_cache_interval * 50)
+def get_all_items(binding_filter):
+	return [(j, i) for j in get_characters()
+	        for i in get_character_items(j, binding_filter=binding_filter)]
+
+def get_all_account_items(binding_filter=None):
+	return get_all_items(binding_filter)
 
 @timed_cache_data(time_cache_interval)
 def get_build():
@@ -279,20 +296,72 @@ def get_account_item_count(item_id):
         return item_counts
 
 @timed_cache_data(time_cache_interval)
-def get_character_items(char_name, collasped=True):
-    result = requester.perform_request(Uri.character_items, char_name)
-    #pprint(result)
-    results = []
-    if result:
-        for bag in result['bags']:
-            if bag:
-                for item in bag['inventory']:
-                    if item:
-                        if ('binding' in item.keys() and item['binding'] not in ['Account', 'AcountBound', 'NoSalvage', 'NoSell', 'AccountBindOnUse']):
-                            results.append(item['id'])
-                        else:
-                            results.append(item['id'])
-    return results
+def get_character_items(char_name, collasped=True, binding_filter=None):
+	if binding_filter is None:
+		binding_filter = ['Account', 'AccountBound', 'NoSalavage', 'NoSell', 'AccountBindOnUse']
+	result = requester.perform_request(Uri.character_items, char_name)
+	results = []
+	if result:
+		for bag in result['bags']:
+			if bag:
+				for item in bag['inventory']:
+					if item:
+						if ('binding' in item.keys() and item['binding'] not in binding_filter):
+							results.append(item['id'])
+						else:
+							results.append(item['id'])
+
+	result = requester.perform_request(Uri.character_equipment, char_name)
+	if result:
+		for item in result['equipment']:
+			print(char_name, get_item_info(item['id'])['name'])
+			results.append(item['id'])
+
+	return results
+
+@timed_cache_data(time_cache_interval * 30)
+def get_account_equipable_items(binding_filter):
+	return [(j, i) for j in get_characters()
+	        for i in get_equipable_items_with_stats(j)]
+
+def get_equipable_items_with_stats(char_name):
+	results = []
+
+	def is_item_equipable(item_id):
+		item_info = get_item_info(item_id)
+		item_info and (item_info['type'] == 'Armor' or
+		               item_info['type'] == 'Back' or
+		               item_info['type'] == 'Weapon' or
+		               item_info['type'] == 'Trinket')
+
+	def get_result_from_item_info(item_info):
+		new_item_info = get_item_info(item_info['id'])
+		if 'stats' in item_info:
+			print("Adding user selected stats")
+			# making it look like the get_item_info data
+			attribs = []
+			for attrib in item_info['stats']['attributes']:
+				attribs.append({'attribute': attrib,
+				                'modifier' : item_info['stats']['attributes'][attrib]})
+			new_item_info['details']['infix_upgrades'] = {'attributes': attribs}
+		return new_item_info
+
+	result = requester.perform_request(Uri.character_items, char_name)
+	results = []
+	if result:
+		for bag in result['bags']:
+			if bag:
+				for item in bag['inventory']:
+					if item and is_item_equipable(item['id']):
+						results.append(get_result_from_item_info(item))
+
+	result = requester.perform_request(Uri.character_equipment, char_name)
+	if result:
+		for item in result['equipment']:
+			if is_item_equipable(item['id']):
+				results.append(get_result_from_item_info(item))
+
+	return results
 
 @timed_cache_data(time_cache_interval)
 def get_account_materials():
@@ -317,5 +386,6 @@ if __name__ == '__main__':
     # pprint(tester(12))
     # pprint(get_recipe_info(20))
 
-    pprint(get_account_materials())
+	# pprint(get_account_materials())
+	pprint(get_equipable_items_with_stats('Hydra Of Stone'))
     

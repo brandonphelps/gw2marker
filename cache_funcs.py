@@ -19,7 +19,6 @@ def cache_data(condi_funct=None, *condi_args, **condi_kwargs):
             else:
                 print("First Computing: {}({})".format(func.__name__, args))
                 val = func(*args, **kwargs)
-                print(val)
                 with open(full_path, 'w') as writer:
                     writer.write(json.dumps(val))
             return val
