@@ -316,12 +316,12 @@ def get_character_items(char_name, collasped=True, binding_filter=None):
 	return results
 
 
-def get_account_equipable_items():
+def get_account_equipable_items(soulbound=None):
 	return [(j, i) for j in get_characters()
-	        for i in get_equipable_items_with_stats(j)]
+	        for i in get_equipable_items_with_stats(j, soulbound=soulbound)]
 
 @timed_cache_data(time_cache_interval * 30)
-def get_equipable_items_with_stats(char_name):
+def get_equipable_items_with_stats(char_name, soulbound=None):
 	results = []
 
 	def is_item_equipable(item_id):
@@ -350,13 +350,28 @@ def get_equipable_items_with_stats(char_name):
 			if bag:
 				for item in bag['inventory']:
 					if item and is_item_equipable(item['id']):
-						results.append(get_result_from_item_info(item))
+						if 'binding' in item and item['binding'] == 'Character':
+							if item['bound_to'] == soulbound:
+								results.append(get_result_from_item_info(item))
+							else:
+								# don't add item since its soulbound to another character
+								pass
+						else:
+							results.append(get_result_from_item_info(item))
 
 	result = requester.perform_request(Uri.character_equipment, char_name)
 	if result:
 		for item in result['equipment']:
 			if is_item_equipable(item['id']):
-				results.append(get_result_from_item_info(item))
+				if 'binding' in item and item['binding'] == 'Character':
+					if item['bound_to'] == soulbound:
+						print(repr(char_name))
+						results.append(get_result_from_item_info(item))
+					else:
+						# don't add item since its soulbaound to another character
+						pass
+				else:
+					results.append(get_result_from_item_info(item))
 
 	return results
 
