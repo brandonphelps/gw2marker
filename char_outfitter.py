@@ -95,6 +95,7 @@ accessory_armors = lambda toon_name: get_account_trinket_filter('Accessory', too
 axe_weapons = lambda toon_name: get_account_weapon_filter('Axe', toon_name)
 sword_weapons = lambda toon_name: get_account_weapon_filter('Sword', toon_name)
 dagger_weapons = lambda toon_name: get_account_weapon_filter('Dagger', toon_name)
+staff_weapons = lambda toon_name: get_account_weapon_filter('Staff', toon_name)
 
 def get_best_equipment_for(char_name, filter_func, attribute_weights, count):
 
@@ -108,8 +109,13 @@ def get_best_equipment():
 	                     'Precision': 0.165,
 	                     'Healing': 0.3,
 	                     'ConditionDamage': 0.165}
-	char_name = 'Hydra Of Stone'
 
+	
+
+	berserker_weights = {'Power': 0.35, 'Precision': 0.25, 'CritDamage': 0.25}
+	minstrels_weights = {'Toughness': 0.3, 'Vitality': 0.165, 'Healing': 0.3, 'BoonDuration': 0.165}
+
+	char_name = 'Hydra Of Stone'
 
 	for category, filter, count in [('Helm', light_helm_armors, 1),
 	                                ('Shoulders', light_shoulders_armors, 1),
@@ -120,10 +126,13 @@ def get_best_equipment():
 	                                ('Ring', ring_armors, 2),
 	                                ('Accessory', accessory_armors, 2),
 	                                ('Amulet', amulet_armors, 1),
-	                                ('Sword', sword_weapons, 1),
-	                                ('Dagger', dagger_weapons, 2)]:
+	                                #('Sword', sword_weapons, 1),
+	                                #('Dagger', dagger_weapons, 2),
+	                                ('Staff', staff_weapons, 1)]:
 
-		for toon_name, item_info, score in get_best_equipment_for(char_name, filter, attribute_weights, count):
+
+
+		for toon_name, item_info, score in get_best_equipment_for(char_name, filter, minstrels_weights, count):
 			if item_info:
 				print(f"{category}: {item_info['name']} {score}")
 			else:

@@ -397,7 +397,10 @@ def write_or_load(path, value, init_value=0):
 if __name__ == '__main__':
     # pprint(tester(12))
     # pprint(get_recipe_info(20))
+	
 
 	# pprint(get_account_materials())
 	pprint(get_equipable_items_with_stats('Hydra Of Stone'))
     
+	for i in get_item_stat_ids():
+		print(get_item_stats(i))

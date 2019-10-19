@@ -5,6 +5,9 @@ import time
 
 cached_folder = 'requests_cache'
 
+def get_cached_value(location, callable, *call_args, **call_kwargs):
+    pass
+
 def cache_data(condi_funct=None, *condi_args, **condi_kwargs):
     def wrapper(func):
         def inner(*args, **kwargs):
