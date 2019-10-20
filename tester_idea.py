@@ -9,6 +9,8 @@ from secrets import key
 
 from urllib.parse import urlencode
 
+from utils import grouper, min_max
+
 gw2_base = 'https://api.guildwars2.com'
 
 class Uri:
@@ -46,9 +48,25 @@ class Uri:
         return f'Uri(base={self.base}, params={self.params})'
 
 class Cacheable:
+    """
+    only tested on caching strings
+    """
     def __init__(self, cache_location):
         self.cache_location = cache_location
         self.folder_path = os.path.dirname(self.cache_location)
+
+    def __call__(self, call, *args, **kwargs):
+        """
+        Call this with a callable and results are returned from the function with items returned and cached.
+        """
+        cached_value = self.get_result()
+        if cached_value is None:
+            value = call(*args, **kwargs)
+            print(f"callable result: {value}")
+            self.save_result(value)
+            return value
+        else:
+            return cached_value
 
     def save_result(self, result):
         if not os.path.isdir(self.folder_path):
@@ -57,66 +75,64 @@ class Cacheable:
             writer.write(result)
 
     def get_result(self):
-        with open(self.cache_location, 'r') as reader:
-            return reader.read()
+        if os.path.isfile(self.cache_location):
+            with open(self.cache_location, 'r') as reader:
+                return reader.read()
+        else:
+            return None
 
+class EndPoint:
+    def __init__(self, uri, cache_handler=None):
+        self.uri = uri
+        self.cache_handler = cache_handler
+
+    def get_cache_location(self):
+        if self.cache_handler:
+            return self.cache_handler.cache_location
+        else:
+            return None
 
 DEBUG = True
 
 class RequestHandler:
-    def __init__(self, request_timeout=0.5):
+    def __init__(self, request_timeout=5):
         self._timeout = request_timeout
 
-    def _perform_reqeust(uri, headers, is_get=True):
+    def _perform_request(self, uri, headers, is_get=True):
         time.sleep(self._timeout)
-        if is_get:
-            return requests.get(uri, headers=headers)
-        else:
-            return requests.post(uri, headers=headers)
-
-    def get(uri, headers=None, cache_handler=None):
-        if headers is None:
-            headers = {}
         if DEBUG:
             print(uri)
-
-        if cache_handler(uri, headers):
-            pass
-        
-
-
-
-
-def get(uri, headers=None):
-    if headers is None:
-        headers = {}
-    if DEBUG:
-        print(uri)
-
-    def perform_request():
-        time.sleep(0.5)
-        return requests.get(uri).json()
-
-    if isinstance(uri, CacheableUri):
-        cache_path = uri.get_disk_loc()
-        print("creating cached file: {}".format(cache_path))
-        if not os.path.isdir(os.path.dirname(cache_path)):
-            os.makedirs(os.path.dirname(cache_path))
-        if os.path.isfile(cache_path):
-            with open(cache_path, 'r') as reader:
-                value = json.loads(reader.read())
+        if headers is None:
+            headers = {}
+        if is_get:
+            return requests.get(uri)
         else:
-            value = perform_request()
-            with open(cache_path, 'w') as writer:
-                writer.write(json.dumps(value))
-    else:
-        value = perform_request()
+            return requests.post(uri)
 
-    return value
+    def get(self, uri, headers=None, cache_handler=None):
+        if cache_handler:
+            def request_cachable_ret(uri, headers):
+                print(f"Perform cacheable ret: {uri}")
+                value = self._perform_request(uri, headers, True)
+                if value.status_code == 200:
+                    return json.dumps(value.json())
+                else:
+                    return ""
 
-
+            value = cache_handler(request_cachable_ret, 
+                                  uri,
+                                  headers)
+            try:
+                value = json.loads(value)
+            except:
+                value = ""
+        else:
+            value = self._perform_request(uri,
+                                          headers,
+                                          is_get=True)
+        return value
         
-gw2_endpoints = [
+gw2_uris = [
     Uri(gw2_base).v2.account,
     Uri(gw2_base).v2.account.achievements,
     Uri(gw2_base).v2.account.bank,
@@ -159,50 +175,53 @@ gw2_endpoints = [
     Uri(gw2_base).v2.worldbosses,
 
     # game mechanics
-    CacheableUri(gw2_base, os.path.join('cache', 'masteries')).v2.masteries,
-    CacheableUri(gw2_base, os.path.join('cache', 'mounts')).v2.mounts,
-    CacheableUri(gw2_base, os.path.join('cache', 'mounts_skins')).v2.mounts.skins,
-    CacheableUri(gw2_base, os.path.join('cache', 'materials')).v2.materials,
+    (Uri(gw2_base).v2.masteries, Cacheable(os.path.join('cache', 'masteries'))),
+    (Uri(gw2_base).v2.mounts, Cacheable(os.path.join('cache', 'mounts'))),
+    (Uri(gw2_base).v2.mounts.skins, Cacheable(os.path.join('cache', 'mounts_skins'))),
+    (Uri(gw2_base).v2.materials, Cacheable(os.path.join('cache', 'materials')))
 ]
 
-def grouper(iterable, n, fillvalue=None):
-    "Collect data into fixed-length chunks or blocks"
-    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
-    args = [iter(iterable)] * n
-    return zip_longest(*args, fillvalue=fillvalue)
 
-def min_max(iterable):
-    min_v = max_v = next(iterable)
-    for j in iterable:
-        if min_v > j:
-            min_v = j
-        if max_v < j:
-            max_v = j
-    return min_v, max_v
+def generate_endpoints_from_ids(id_listing, name, cache_path_format):
+    new_endpoints = []
+    pass
 
-def appended_id_api_gen(endpoint_list, name, root_api, api_type):
-    for i in grouper(get(root_api), 100):
-        min_v, max_v = min_max(filter(lambda x: x, i))
-        print(min_v, max_v)
-        endpoint_list.append(api_type(gw2_base, os.path.join('cache', name, str(i))).v2[name][min_v:max_v])
 
-items_ids = CacheableUri(gw2_base, os.path.join('cache', 'items_ids')).v2.items
-gw2_endpoints.append(items_ids)
-items_stats_ids = CacheableUri(gw2_base, os.path.join('cache', 'itemstats_ids')).v2.itemstats
-gw2_endpoints.append(items_stats_ids)
 
-pvp_amulet_ids = CacheableUri(gw2_base, os.path.join('cache', 'pvp', 'amulets_ids')).v2.pvp.amulets
-gw2_endpoints.append(pvp_amulet_ids)
 
+items_ids_endpoint = EndPoint(Uri(gw2_base).v2.items, Cacheable(os.path.join('cache', 'items_ids')))
+items_stats_ids = EndPoint(Uri(gw2_base).v2.itemstats, Cacheable(os.path.join('cache', 'itemstats_ids')))
+pvp_amulet_ids = EndPoint(Uri(gw2_base).v2.pvp.amulets, Cacheable(os.path.join('cache', 'pvp', 'amulets_ids')))
+
+def build_endpoints(uri_list):
+    for uri in uri_list:
+        if isinstance(uri, Uri):
+            yield EndPoint(uri)
+        else:
+            yield EndPoint(uri[0], uri[1])            
+
+gw2_endpoints = list(build_endpoints(gw2_uris))
+gw2_endpoints.extend([items_ids_endpoint, items_stats_ids,
+                      pvp_amulet_ids])
 
 global_params = {
     'access_token' : key
 }
 
 if __name__ == "__main__":
-    #for i in gw2_endpoints:
-    appended_id_api_gen(gw2_endpoints, 'items', items_ids, CacheableUri)
+
+    k = Uri('hello world')
+    j = k.wakka
+    assert(k != j)
+    assert(str(k) == str(Uri('hello world')))
+    
+
+    r = RequestHandler()
+
+    generate_endpoints_from_ids(r, items_ids_endpoint, 'item', [Cacheable(os.path.join('cache', 'item_', i)
     #appended_id_api_gen(gw2_endpoints, 'itemstats', items_stats_ids, CacheableUri)
     #appended_id_api_gen(gw2_endpoints, 'pvp/amulets', pvp_amulet_ids, CacheableUri)
-    for i in filter(lambda x: isinstance(x, CacheableUri), gw2_endpoints):
-        print(get(i(**global_params)))
+    for i in filter(lambda x: x.get_cache_location(), gw2_endpoints):
+        print("Getting the things!")
+        print(i.uri(**global_params))
+        print(r.get(i.uri(**global_params), cache_handler=i.cache_handler))
