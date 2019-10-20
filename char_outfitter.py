@@ -114,7 +114,8 @@ def get_best_equipment():
 
 	berserker_weights = {'Power': 0.35, 'Precision': 0.25, 'CritDamage': 0.25}
 	minstrels_weights = {'Toughness': 0.3, 'Vitality': 0.165, 'Healing': 0.3, 'BoonDuration': 0.165}
-
+	viper_weights =	    {'Power' : 0.35, 'Precision' : 0.25, 'ConditionDamage' : 0.35, 'Expertise' : 0.25}
+	
 	char_name = 'Hydra Of Stone'
 
 	for category, filter, count in [('Helm', light_helm_armors, 1),
@@ -132,7 +133,7 @@ def get_best_equipment():
 
 
 
-		for toon_name, item_info, score in get_best_equipment_for(char_name, filter, minstrels_weights, count):
+		for toon_name, item_info, score in get_best_equipment_for(char_name, filter, viper_weights, count):
 			if item_info:
 				print(f"{category}: {item_info['name']} {score}")
 			else:

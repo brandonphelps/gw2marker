@@ -11,28 +11,6 @@ from urllib.parse import urlencode
 
 gw2_base = 'https://api.guildwars2.com'
 
-
-class APIEndPoint:
-    def __init__(self):
-        pass
-
-class JsonAPIEndPoint:
-    def __init__(self, url):
-        self._url = url
-
-class UriPathPart:
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return self.value
-
-    def __truediv__(self, other):  # python3 replacement for div
-        if isinstance(other, UriPathPart):
-            return UriPathPart(self.value + '/' + other.value)
-        else:
-            return UriPathPart(self.value + '/' + str(other))
-
 class Uri:
     def __init__(self, base, params=None):
         self.base = base
