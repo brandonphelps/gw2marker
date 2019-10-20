@@ -45,33 +45,46 @@ class Uri:
     def __repr__(self):
         return f'Uri(base={self.base}, params={self.params})'
 
-class CacheableUri(Uri):
-    def __init__(self, base, disk_loc, params=None):
-        super().__init__(base, params)
-        self.__dict__['disk_loc'] = disk_loc
+class Cacheable:
+    def __init__(self, cache_location):
+        self.cache_location = cache_location
+        self.folder_path = os.path.dirname(self.cache_location)
 
-    def get_disk_loc(self):
-        return self.__dict__['disk_loc']
-        
-    def __call__(self, **params):
-        return CacheableUri(self.base,
-                            self.disk_loc,
-                            dict(self.params, **params))
+    def save_result(self, result):
+        if not os.path.isdir(self.folder_path):
+            os.makedirs(self.folder_path)
+        with open(self.cache_location, 'w') as writer:
+            writer.write(result)
 
-    def __getattr__(self, attr):
-        return CacheableUri(self.base + '/' + attr,
-                            self.disk_loc,
-                            self.params)
-
-    def __getitem__(self, item):
-        if isinstance(item, slice):
-            int_str = [i for i in range(item.stop)][item.start:item.stop:item.step]
-            return self.__getattr__(','.join([str(i) for i in int_str]))
-        else:
-            return self.__getattr__(str(item))
+    def get_result(self):
+        with open(self.cache_location, 'r') as reader:
+            return reader.read()
 
 
 DEBUG = True
+
+class RequestHandler:
+    def __init__(self, request_timeout=0.5):
+        self._timeout = request_timeout
+
+    def _perform_reqeust(uri, headers, is_get=True):
+        time.sleep(self._timeout)
+        if is_get:
+            return requests.get(uri, headers=headers)
+        else:
+            return requests.post(uri, headers=headers)
+
+    def get(uri, headers=None, cache_handler=None):
+        if headers is None:
+            headers = {}
+        if DEBUG:
+            print(uri)
+
+        if cache_handler(uri, headers):
+            pass
+        
+
+
 
 
 def get(uri, headers=None):
