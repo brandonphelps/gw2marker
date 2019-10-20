@@ -5,6 +5,7 @@ import requests
 import json
 from itertools import zip_longest
 
+from pprint import pprint
 from secrets import key
 
 from urllib.parse import urlencode
@@ -39,6 +40,7 @@ class Uri:
 
     def __getitem__(self, item):
         if isinstance(item, slice):
+            print(item)
             int_str = [i for i in range(item.stop)][item.start:item.stop:item.step]
             return self.__getattr__(','.join([str(i) for i in int_str]))
         else:
@@ -131,7 +133,7 @@ class RequestHandler:
                                             headers,
                                             is_get=True)
         else:
-            value = self._perform_request(uri,
+            value = self._perform_request(end_point.uri,
                                           headers,
                                           is_get=True)
         return value
@@ -185,7 +187,6 @@ gw2_uris = [
     (Uri(gw2_base).v2.materials, JsonRequestCacheable(os.path.join('cache', 'materials')))
 ]
 
-
 global_params = {
     'access_token' : key
 }
@@ -201,14 +202,25 @@ pvp_amulet_ids = EndPoint(Uri(gw2_base).v2.pvp.amulets, JsonRequestCacheable(os.
 def bundle_apis(uri_list, uri_base):
     api_ends = []
     uri_base_length = len(uri_base)
+    print(f'Base: {uri_base}')
     for uri in uri_list:
-        if uri.find(uri_base) == 0:
+        print(f'{str(uri)} - {str(uri).find(uri_base)}')
+        if str(uri).find(uri_base) == 0:
             # is a candiate to be bundled.
-            api_ending_str = uri[uri_base_length:]
+            api_ending_str = str(uri)[uri_base_length:]
             if api_ending_str: # remove empty strings
                 api_ends.append(api_ending_str)
 
-    return uri_base + ','.join(api_ends)
+    #return uri_base + ','.join(api_ends)
+    return ','.join(api_ends)
+
+def handle_multiple_requests(request_handler, uri_list, uri_base):
+    new_endpoint_uri = bundle_apis(uri_list, uri_base)
+    p = EndPoint(Uri(uri_base)(ids=new_endpoint_uri))
+    print('requesting: {}'.format(p.uri))
+    j = request_handler.get(p)
+    return j
+
 
 def build_endpoints(uri_list):
     for uri in uri_list:
@@ -221,6 +233,18 @@ gw2_endpoints = list(build_endpoints(gw2_uris))
 gw2_endpoints.extend([items_ids_endpoint, items_stats_ids,
                       pvp_amulet_ids])
 
+
+r = RequestHandler()
+
+first_couple_items = []
+
+for item_id in r.get(items_ids_endpoint):
+    new_endpoint = EndPoint(Uri(gw2_base).v2.items[str(item_id)],
+                            JsonRequestCacheable('cache', 'item', str(item_id)))
+    gw2_endpoints.append(new_endpoint)
+    if len(first_couple_items) < 10:
+        first_couple_items.append(new_endpoint)
+
 if __name__ == "__main__":
 
     k = Uri('hello world')
@@ -229,18 +253,24 @@ if __name__ == "__main__":
     assert(str(k) == str(Uri('hello world')))
     
 
-    r = RequestHandler()
 
-    for item_id in r.get(items_ids_endpoint):
-        new_endpoint = EndPoint(Uri(gw2_base).v2.items[str(item_id)],
-                                JsonRequestCacheable('cache', 'item', str(item_id)))
-        gw2_endpoints.append(new_endpoint)
+    #for item_id in r.get(items_stats_ids):
+    #    new_endpoint = EndPoint(Uri(gw2_base).v2.itemstats[str(item_id)],
+    #                            JsonRequestCacheable('cache', 'itemstats', str(item_id)))
+    #    gw2_endpoints.append(new_endpoint)
 
-    for item_id in r.get(items_stats_ids):
-        new_endpoint = EndPoint(Uri(gw2_base).v2.itemstats[str(item_id)],
-                                JsonRequestCacheable('cache', 'itemstats', str(item_id)))
-        gw2_endpoints.append(new_endpoint)
+    #for i in filter(lambda x: x.is_cacheable(), gw2_endpoints):
+    #    print("Getting the things!")
+    #    print(r.get(i))
 
-    for i in filter(lambda x: x.is_cacheable(), gw2_endpoints):
-        print("Getting the things!")
-        print(r.get(i))
+    print(str(items_ids_endpoint.uri))
+    pprint(list(map(lambda x: str(x.uri), first_couple_items)))
+    #asyncio.run(q_main())
+    f = handle_multiple_requests(r, map(lambda x: x.uri, first_couple_items),
+                                 str(items_ids_endpoint.uri) + '/')
+    print(f)
+    #print(f.json())
+    #print(f.text)
+
+
+    
