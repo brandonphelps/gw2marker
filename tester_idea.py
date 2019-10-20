@@ -62,7 +62,6 @@ class Cacheable:
         cached_value = self.get_result()
         if cached_value is None:
             value = call(*args, **kwargs)
-            print(f"callable result: {value}")
             self.save_result(value)
             return value
         else:
@@ -210,8 +209,6 @@ gw2_endpoints = list(build_endpoints(gw2_uris))
 gw2_endpoints.extend([items_ids_endpoint, items_stats_ids,
                       pvp_amulet_ids])
 
-
-
 if __name__ == "__main__":
 
     k = Uri('hello world')
@@ -227,11 +224,11 @@ if __name__ == "__main__":
                                 JsonRequestCacheable('cache', 'item', str(item_id)))
         gw2_endpoints.append(new_endpoint)
 
+    for item_id in r.get(items_stats_ids):
+        new_endpoint = EndPoint(Uri(gw2_base).v2.itemstats[str(item_id)],
+                                JsonRequestCacheable('cache', 'itemstats', str(item_id)))
+        gw2_endpoints.append(new_endpoint)
 
-    #generate_endpoints_from_ids(r, items_ids_endpoint, 'item', [Cacheable(os.path.join('cache', 'item_', i)
-    #appended_id_api_gen(gw2_endpoints, 'itemstats', items_stats_ids, CacheableUri)
-    #appended_id_api_gen(gw2_endpoints, 'pvp/amulets', pvp_amulet_ids, CacheableUri)
     for i in filter(lambda x: x.is_cacheable(), gw2_endpoints):
         print("Getting the things!")
-        print(i.uri)
         print(r.get(i))
