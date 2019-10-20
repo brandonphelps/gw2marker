@@ -198,6 +198,18 @@ items_ids_endpoint = EndPoint(Uri(gw2_base).v2.items, JsonRequestCacheable(os.pa
 items_stats_ids = EndPoint(Uri(gw2_base).v2.itemstats, JsonRequestCacheable(os.path.join('cache', 'itemstats_ids')))
 pvp_amulet_ids = EndPoint(Uri(gw2_base).v2.pvp.amulets, JsonRequestCacheable(os.path.join('cache', 'pvp', 'amulets_ids')))
 
+def bundle_apis(uri_list, uri_base):
+    api_ends = []
+    uri_base_length = len(uri_base)
+    for uri in uri_list:
+        if uri.find(uri_base) == 0:
+            # is a candiate to be bundled.
+            api_ending_str = uri[uri_base_length:]
+            if api_ending_str: # remove empty strings
+                api_ends.append(api_ending_str)
+
+    return uri_base + ','.join(api_ends)
+
 def build_endpoints(uri_list):
     for uri in uri_list:
         if isinstance(uri, Uri):
