@@ -51,8 +51,8 @@ class Cacheable:
     """
     only tested on caching strings
     """
-    def __init__(self, cache_location):
-        self.cache_location = cache_location
+    def __init__(self, *args):
+        self.cache_location = os.path.join(*args)
         self.folder_path = os.path.dirname(self.cache_location)
 
     def __call__(self, call, *args, **kwargs):
@@ -81,6 +81,19 @@ class Cacheable:
         else:
             return None
 
+class JsonRequestCacheable(Cacheable):
+    """
+    Saved the json output of a requests.get/post obj
+    """
+    def __call__(self, call, *args, **kwargs):
+        cached_value = self.get_result()
+        if cached_value is None:
+            value = call(*args, **kwargs).json()
+            self.save_result(json.dumps(value))
+            return value
+        else:
+            return json.loads(cached_value)
+
 class EndPoint:
     def __init__(self, uri, cache_handler=None):
         self.uri = uri
@@ -91,6 +104,9 @@ class EndPoint:
             return self.cache_handler.cache_location
         else:
             return None
+
+    def is_cacheable(self):
+        return self.cache_handler is not None
 
 DEBUG = True
 
@@ -108,24 +124,13 @@ class RequestHandler:
             return requests.get(uri)
         else:
             return requests.post(uri)
-
-    def get(self, uri, headers=None, cache_handler=None):
-        if cache_handler:
-            def request_cachable_ret(uri, headers):
-                print(f"Perform cacheable ret: {uri}")
-                value = self._perform_request(uri, headers, True)
-                if value.status_code == 200:
-                    return json.dumps(value.json())
-                else:
-                    return ""
-
-            value = cache_handler(request_cachable_ret, 
-                                  uri,
-                                  headers)
-            try:
-                value = json.loads(value)
-            except:
-                value = ""
+        
+    def get(self, end_point, headers=None):
+        if end_point.is_cacheable():
+            value = end_point.cache_handler(self._perform_request,
+                                            end_point.uri,
+                                            headers,
+                                            is_get=True)
         else:
             value = self._perform_request(uri,
                                           headers,
@@ -175,38 +180,37 @@ gw2_uris = [
     Uri(gw2_base).v2.worldbosses,
 
     # game mechanics
-    (Uri(gw2_base).v2.masteries, Cacheable(os.path.join('cache', 'masteries'))),
-    (Uri(gw2_base).v2.mounts, Cacheable(os.path.join('cache', 'mounts'))),
-    (Uri(gw2_base).v2.mounts.skins, Cacheable(os.path.join('cache', 'mounts_skins'))),
-    (Uri(gw2_base).v2.materials, Cacheable(os.path.join('cache', 'materials')))
+    (Uri(gw2_base).v2.masteries, JsonRequestCacheable(os.path.join('cache', 'masteries'))),
+    (Uri(gw2_base).v2.mounts, JsonRequestCacheable(os.path.join('cache', 'mounts'))),
+    (Uri(gw2_base).v2.mounts.skins, JsonRequestCacheable(os.path.join('cache', 'mounts_skins'))),
+    (Uri(gw2_base).v2.materials, JsonRequestCacheable(os.path.join('cache', 'materials')))
 ]
 
+
+global_params = {
+    'access_token' : key
+}
 
 def generate_endpoints_from_ids(id_listing, name, cache_path_format):
     new_endpoints = []
     pass
 
-
-
-
-items_ids_endpoint = EndPoint(Uri(gw2_base).v2.items, Cacheable(os.path.join('cache', 'items_ids')))
-items_stats_ids = EndPoint(Uri(gw2_base).v2.itemstats, Cacheable(os.path.join('cache', 'itemstats_ids')))
-pvp_amulet_ids = EndPoint(Uri(gw2_base).v2.pvp.amulets, Cacheable(os.path.join('cache', 'pvp', 'amulets_ids')))
+items_ids_endpoint = EndPoint(Uri(gw2_base).v2.items, JsonRequestCacheable(os.path.join('cache', 'items_ids')))
+items_stats_ids = EndPoint(Uri(gw2_base).v2.itemstats, JsonRequestCacheable(os.path.join('cache', 'itemstats_ids')))
+pvp_amulet_ids = EndPoint(Uri(gw2_base).v2.pvp.amulets, JsonRequestCacheable(os.path.join('cache', 'pvp', 'amulets_ids')))
 
 def build_endpoints(uri_list):
     for uri in uri_list:
         if isinstance(uri, Uri):
-            yield EndPoint(uri)
+            yield EndPoint(uri(**global_params))
         else:
-            yield EndPoint(uri[0], uri[1])            
+            yield EndPoint(uri[0](**global_params), uri[1])
 
 gw2_endpoints = list(build_endpoints(gw2_uris))
 gw2_endpoints.extend([items_ids_endpoint, items_stats_ids,
                       pvp_amulet_ids])
 
-global_params = {
-    'access_token' : key
-}
+
 
 if __name__ == "__main__":
 
@@ -218,10 +222,16 @@ if __name__ == "__main__":
 
     r = RequestHandler()
 
-    generate_endpoints_from_ids(r, items_ids_endpoint, 'item', [Cacheable(os.path.join('cache', 'item_', i)
+    for item_id in r.get(items_ids_endpoint):
+        new_endpoint = EndPoint(Uri(gw2_base).v2.items[str(item_id)],
+                                JsonRequestCacheable('cache', 'item', str(item_id)))
+        gw2_endpoints.append(new_endpoint)
+
+
+    #generate_endpoints_from_ids(r, items_ids_endpoint, 'item', [Cacheable(os.path.join('cache', 'item_', i)
     #appended_id_api_gen(gw2_endpoints, 'itemstats', items_stats_ids, CacheableUri)
     #appended_id_api_gen(gw2_endpoints, 'pvp/amulets', pvp_amulet_ids, CacheableUri)
-    for i in filter(lambda x: x.get_cache_location(), gw2_endpoints):
+    for i in filter(lambda x: x.is_cacheable(), gw2_endpoints):
         print("Getting the things!")
-        print(i.uri(**global_params))
-        print(r.get(i.uri(**global_params), cache_handler=i.cache_handler))
+        print(i.uri)
+        print(r.get(i))
